@@ -37,6 +37,8 @@ from backend.app.schemas.admin import (
     AuditLogList,
     AuditLogRead,
     ConfigurationExport,
+    ConfigurationImport,
+    ConfigurationImportResult,
     ErrorLogCreate,
     ErrorLogList,
     ErrorLogRead,
@@ -376,3 +378,20 @@ def export_configuration(db: Session = Depends(get_db), _: User = Depends(requir
         PermissionRepository(db),
     )
     return service.export()
+
+
+@router.post("/config/import", response_model=ConfigurationImportResult, summary="Importer la configuration")
+def import_configuration(
+    payload: ConfigurationImport,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+) -> ConfigurationImportResult:
+    service = ConfigurationService(
+        SettingRepository(db),
+        AiProviderRepository(db),
+        AiModelRepository(db),
+        SystemParameterRepository(db),
+        RoleRepository(db),
+        PermissionRepository(db),
+    )
+    return service.import_config(payload)

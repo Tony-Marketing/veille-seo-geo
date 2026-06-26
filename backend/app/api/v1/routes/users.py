@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.api.v1.routes.factory import create_crud_router
 from backend.app.core.database import get_db
+from backend.app.core.security import require_admin
 from backend.app.repositories.auth import RoleRepository, UserRepository
 from backend.app.schemas.auth import UserCreate, UserList, UserRead, UserUpdate
 from backend.app.services.auth import UserService
@@ -24,4 +25,5 @@ router = create_crud_router(
     update_schema=UserUpdate,
     read_schema=UserRead,
     list_schema=UserList,
+    dependencies=[Depends(require_admin)],
 )

@@ -244,6 +244,36 @@ class ConfigurationExport(BaseModel):
     permissions: list[PermissionRead]
 
 
+class ConfigurationPermissionImport(BaseModel):
+    code: str = Field(min_length=2, max_length=150)
+    label: str = Field(min_length=2, max_length=150)
+    module: str = Field(min_length=2, max_length=100)
+    description: str | None = None
+
+
+class ConfigurationRoleImport(BaseModel):
+    name: str = Field(min_length=2, max_length=100)
+    description: str | None = None
+    is_system: bool = False
+    permission_ids: list[int] = Field(default_factory=list)
+    permissions: list[ConfigurationPermissionImport] = Field(default_factory=list)
+
+
+class ConfigurationImport(BaseModel):
+    settings: list[SettingCreate] = Field(default_factory=list)
+    ai_providers: list[AiProviderCreate] = Field(default_factory=list)
+    ai_models: list[AiModelCreate] = Field(default_factory=list)
+    system_parameters: list[SystemParameterCreate] = Field(default_factory=list)
+    roles: list[ConfigurationRoleImport] = Field(default_factory=list)
+    permissions: list[ConfigurationPermissionImport] = Field(default_factory=list)
+
+
+class ConfigurationImportResult(BaseModel):
+    created: dict[str, int]
+    updated: dict[str, int]
+    skipped: dict[str, int]
+
+
 SettingList = PaginatedResponse[SettingRead]
 AiProviderList = PaginatedResponse[AiProviderRead]
 AiModelList = PaginatedResponse[AiModelRead]

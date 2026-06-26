@@ -1,6 +1,9 @@
 """Routes Permissions."""
 
+from fastapi import Depends
+
 from backend.app.api.v1.routes.factory import create_crud_router
+from backend.app.core.security import require_admin
 from backend.app.repositories.auth import PermissionRepository
 from backend.app.schemas.auth import PermissionCreate, PermissionList, PermissionRead, PermissionUpdate
 from backend.app.services.auth import PermissionService
@@ -14,4 +17,5 @@ router = create_crud_router(
     update_schema=PermissionUpdate,
     read_schema=PermissionRead,
     list_schema=PermissionList,
+    dependencies=[Depends(require_admin)],
 )

@@ -31,6 +31,8 @@ from backend.app.schemas.admin import (
     ApiKeyRead,
     AuditLogRead,
     ConfigurationExport,
+    ConfigurationImport,
+    ConfigurationImportResult,
     ErrorLogRead,
     HealthOverviewRead,
     ServiceHealthRead,
@@ -273,13 +275,12 @@ class ConfigurationService:
     def export(self) -> ConfigurationExport:
         """Export non-secret configuration."""
 
-        params = PaginationParams(page=1, page_size=100)
-        settings_items, _ = self.setting_repository.list(params)
-        providers, _ = self.provider_repository.list(params)
-        models, _ = self.model_repository.list(params)
-        parameters, _ = self.parameter_repository.list(params)
-        roles, _ = self.role_repository.list(params)
-        permissions, _ = self.permission_repository.list(params)
+        settings_items = self._list_all(self.setting_repository)
+        providers = self._list_all(self.provider_repository)
+        models = self._list_all(self.model_repository)
+        parameters = self._list_all(self.parameter_repository)
+        roles = self._list_all(self.role_repository)
+        permissions = self._list_all(self.permission_repository)
         return ConfigurationExport(
             settings=[SettingRead.model_validate(item) for item in settings_items],
             ai_providers=[AiProviderRead.model_validate(item) for item in providers],
@@ -288,3 +289,126 @@ class ConfigurationService:
             roles=[RoleRead.model_validate(item) for item in roles],
             permissions=[PermissionRead.model_validate(item) for item in permissions],
         )
+
+    def import_config(self, payload: ConfigurationImport) -> ConfigurationImportResult:
+        """Import configuration with idempotent upserts and no destructive delete."""
+
+        created = self._empty_import_counts()
+        updated = self._empty_import_counts()
+        skipped = self._empty_import_counts()
+
+        for item in payload.settings:
+            self._upsert_by_field(
+                self.setting_repository,
+                "key",
+                item.model_dump(exclude_unset=True),
+                created,
+                updated,
+                "settings",
+            )
+
+        for item in payload.ai_providers:
+            self._upsert_by_field(
+                self.provider_repository,
+                "name",
+                item.model_dump(exclude_unset=True),
+                created,
+                updated,
+                "ai_providers",
+            )
+
+        permission_payloads = {item.code: item for item in payload.permissions}
+        for role in payload.roles:
+            for permission in role.permissions:
+                permission_payloads.setdefault(permission.code, permission)
+        for item in permission_payloads.values():
+            self._upsert_by_field(
+                self.permission_repository,
+                "code",
+                item.model_dump(exclude_unset=True),
+                created,
+                updated,
+                "permissions",
+            )
+
+        for item in payload.system_parameters:
+            data = item.model_dump(exclude_unset=True)
+            existing = self.parameter_repository.get_by_category_key(data["category"], data["key"])
+            if existing is None:
+                self.parameter_repository.create(data)
+                created["system_parameters"] += 1
+            else:
+                self.parameter_repository.update(existing, data)
+                updated["system_parameters"] += 1
+
+        for item in payload.ai_models:
+            data = item.model_dump(exclude_unset=True)
+            if self.provider_repository.get(data["provider_id"]) is None:
+                skipped["ai_models"] += 1
+                continue
+            self._upsert_by_field(
+                self.model_repository,
+                "api_identifier",
+                data,
+                created,
+                updated,
+                "ai_models",
+            )
+
+        for item in payload.roles:
+            data = item.model_dump(exclude={"permission_ids", "permissions"}, exclude_unset=True)
+            role = self.role_repository.get_by_field("name", data["name"])
+            if role is None:
+                role = self.role_repository.create(data)
+                created["roles"] += 1
+            else:
+                role = self.role_repository.update(role, data)
+                updated["roles"] += 1
+
+            permission_ids = list(item.permission_ids)
+            for permission in item.permissions:
+                stored_permission = self.permission_repository.get_by_field("code", permission.code)
+                if stored_permission is not None:
+                    permission_ids.append(stored_permission.id)
+            role.permissions = self.permission_repository.list_by_ids(sorted(set(permission_ids)))
+            self.role_repository.db.commit()
+            self.role_repository.db.refresh(role)
+
+        return ConfigurationImportResult(created=created, updated=updated, skipped=skipped)
+
+    def _list_all(self, repository: SettingRepository) -> list:
+        page = 1
+        items = []
+        while True:
+            batch, total = repository.list(PaginationParams(page=page, page_size=100))
+            items.extend(batch)
+            if len(items) >= total or not batch:
+                return items
+            page += 1
+
+    def _upsert_by_field(
+        self,
+        repository: SettingRepository,
+        field_name: str,
+        data: dict,
+        created: dict[str, int],
+        updated: dict[str, int],
+        counter_key: str,
+    ) -> None:
+        existing = repository.get_by_field(field_name, data[field_name])
+        if existing is None:
+            repository.create(data)
+            created[counter_key] += 1
+            return
+        repository.update(existing, data)
+        updated[counter_key] += 1
+
+    def _empty_import_counts(self) -> dict[str, int]:
+        return {
+            "settings": 0,
+            "ai_providers": 0,
+            "ai_models": 0,
+            "system_parameters": 0,
+            "roles": 0,
+            "permissions": 0,
+        }
