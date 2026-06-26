@@ -20,10 +20,11 @@ def create_crud_router(
     update_schema: type[BaseModel],
     read_schema: type[BaseModel],
     list_schema: type[BaseModel],
+    dependencies: list[Any] | None = None,
 ) -> APIRouter:
     """Create a standard CRUD router for simple resources."""
 
-    router = APIRouter(prefix=prefix, tags=tags)
+    router = APIRouter(prefix=prefix, tags=tags, dependencies=dependencies or [])
 
     def get_service(db: Session = Depends(get_db)) -> Any:
         if isinstance(service_class, type):
