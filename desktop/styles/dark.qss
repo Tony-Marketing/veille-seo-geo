@@ -1,0 +1,114 @@
+QWidget {
+    background-color: #111827;
+    color: #E5E7EB;
+    font-family: "Segoe UI";
+    font-size: 14px;
+}
+
+#TopBar {
+    background-color: #0F172A;
+    border-bottom: 1px solid #253044;
+}
+
+#TopBarTitle {
+    color: #F9FAFB;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+#Sidebar {
+    background-color: #0B1220;
+    border-right: 1px solid #253044;
+    min-width: 220px;
+    max-width: 220px;
+}
+
+#SidebarNavigation {
+    background-color: transparent;
+    border: none;
+    outline: none;
+}
+
+#SidebarNavigation::item {
+    border-radius: 8px;
+    color: #CBD5E1;
+    margin: 2px 0;
+    padding: 12px 14px;
+}
+
+#SidebarNavigation::item:hover {
+    background-color: #1F2937;
+    color: #FFFFFF;
+}
+
+#SidebarNavigation::item:selected {
+    background-color: #2563EB;
+    color: #FFFFFF;
+}
+
+#StatusBar {
+    background-color: #0F172A;
+    border-top: 1px solid #253044;
+}
+
+#StatusBarLabel,
+#ValueLabel,
+#MessageLabel,
+#PlaceholderLabel {
+    color: #CBD5E1;
+}
+
+#PageTitle {
+    color: #F9FAFB;
+    font-size: 24px;
+    font-weight: 600;
+}
+
+#PageSubtitle {
+    color: #E5E7EB;
+    font-size: 18px;
+    font-weight: 500;
+}
+
+QPushButton {
+    background-color: #2563EB;
+    border: 1px solid #3B82F6;
+    border-radius: 8px;
+    color: #FFFFFF;
+    font-weight: 600;
+    padding: 8px 14px;
+}
+
+QPushButton:hover {
+    background-color: #1D4ED8;
+}
+
+QPushButton:disabled {
+    background-color: #374151;
+    border-color: #4B5563;
+    color: #9CA3AF;
+}
+
+#DataTable {
+    alternate-background-color: #172033;
+    background-color: #111827;
+    border: 1px solid #253044;
+    border-radius: 8px;
+    gridline-color: #253044;
+    selection-background-color: #2563EB;
+    selection-color: #FFFFFF;
+}
+
+QHeaderView::section {
+    background-color: #1F2937;
+    border: none;
+    border-right: 1px solid #253044;
+    color: #F9FAFB;
+    font-weight: 600;
+    padding: 8px;
+}
+
+QTableCornerButton::section {
+    background-color: #1F2937;
+    border: none;
+}
