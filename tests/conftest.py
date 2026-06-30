@@ -1,6 +1,8 @@
 """Configuration Pytest."""
 
+import sys
 from collections.abc import Generator
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -12,6 +14,10 @@ from backend.app.core.database import Base, get_db
 from backend.app.core.security import create_access_token, hash_password
 from backend.app.main import app
 from backend.app.models import User
+
+DESKTOP_PATH = Path(__file__).resolve().parents[1] / "desktop"
+if str(DESKTOP_PATH) not in sys.path:
+    sys.path.insert(0, str(DESKTOP_PATH))
 
 
 @pytest.fixture()

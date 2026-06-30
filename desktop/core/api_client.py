@@ -9,20 +9,38 @@ from core.config import API_BASE_URL, HTTP_TIMEOUT_SECONDS
 class ApiClientError(RuntimeError):
     """Erreur lisible pour les problemes de communication API."""
 
+    def __init__(
+        self,
+        message: str,
+        *,
+        status_code: int | None = None,
+        details: Any | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+        self.details = details
+
 
 class ApiClient:
     """Client REST centralise pour communiquer avec l'API FastAPI."""
 
-    def __init__(self, base_url: str = API_BASE_URL, timeout: float = HTTP_TIMEOUT_SECONDS) -> None:
+    def __init__(
+        self,
+        base_url: str = API_BASE_URL,
+        timeout: float = HTTP_TIMEOUT_SECONDS,
+        transport: httpx.BaseTransport | None = None,
+    ) -> None:
         """Initialise le client HTTP.
 
         Args:
             base_url: URL racine de l'API REST.
             timeout: Delai maximum des requetes HTTP en secondes.
+            transport: Transport HTTP optionnel, utile pour les tests sans reseau.
         """
 
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
+        self.transport = transport
 
     def get(self, path: str, params: dict[str, Any] | None = None) -> Any:
         """Execute une requete GET vers l'API."""
@@ -67,14 +85,30 @@ class ApiClient:
         url = f"{self.base_url}/{path.lstrip('/')}"
 
         try:
-            with httpx.Client(timeout=self.timeout) as client:
+            with httpx.Client(timeout=self.timeout, transport=self.transport) as client:
                 response = client.request(method, url, params=params, json=json)
                 response.raise_for_status()
         except httpx.HTTPStatusError as exc:
-            raise ApiClientError(f"Erreur API {exc.response.status_code} pour {url}") from exc
+            details = self._safe_error_details(exc.response)
+            raise ApiClientError(
+                f"Erreur API {exc.response.status_code} pour {url}",
+                status_code=exc.response.status_code,
+                details=details,
+            ) from exc
         except httpx.RequestError as exc:
             raise ApiClientError(f"API indisponible pour {url}") from exc
 
         if response.status_code == httpx.codes.NO_CONTENT:
             return None
-        return response.json()
+        try:
+            return response.json()
+        except ValueError as exc:
+            raise ApiClientError(f"Reponse API invalide pour {url}", status_code=response.status_code) from exc
+
+    def _safe_error_details(self, response: httpx.Response) -> Any | None:
+        """Return JSON error details when the API response contains valid JSON."""
+
+        try:
+            return response.json()
+        except ValueError:
+            return None
