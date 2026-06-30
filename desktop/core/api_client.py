@@ -4,6 +4,7 @@ from typing import Any
 
 import httpx
 from core.config import API_BASE_URL, HTTP_TIMEOUT_SECONDS
+from core.session import DesktopSession
 
 
 class ApiClientError(RuntimeError):
@@ -29,6 +30,8 @@ class ApiClient:
         base_url: str = API_BASE_URL,
         timeout: float = HTTP_TIMEOUT_SECONDS,
         transport: httpx.BaseTransport | None = None,
+        session: DesktopSession | None = None,
+        access_token: str | None = None,
     ) -> None:
         """Initialise le client HTTP.
 
@@ -36,11 +39,15 @@ class ApiClient:
             base_url: URL racine de l'API REST.
             timeout: Delai maximum des requetes HTTP en secondes.
             transport: Transport HTTP optionnel, utile pour les tests sans reseau.
+            session: Session Desktop optionnelle contenant le token courant.
+            access_token: Token optionnel pour les usages simples ou les tests.
         """
 
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
         self.transport = transport
+        self.session = session
+        self.access_token = access_token
 
     def get(self, path: str, params: dict[str, Any] | None = None) -> Any:
         """Execute une requete GET vers l'API."""
@@ -86,7 +93,13 @@ class ApiClient:
 
         try:
             with httpx.Client(timeout=self.timeout, transport=self.transport) as client:
-                response = client.request(method, url, params=params, json=json)
+                response = client.request(
+                    method,
+                    url,
+                    params=params,
+                    json=json,
+                    headers=self._auth_headers(),
+                )
                 response.raise_for_status()
         except httpx.HTTPStatusError as exc:
             details = self._safe_error_details(exc.response)
@@ -112,3 +125,13 @@ class ApiClient:
             return response.json()
         except ValueError:
             return None
+
+    def _auth_headers(self) -> dict[str, str] | None:
+        """Return Authorization headers when a token is available."""
+
+        token = self.access_token
+        if token is None and self.session is not None:
+            token = self.session.access_token
+        if not token:
+            return None
+        return {"Authorization": f"Bearer {token}"}
