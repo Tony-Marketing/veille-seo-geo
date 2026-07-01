@@ -1,5 +1,6 @@
 """Boite de dialogue de connexion Desktop."""
 
+from core.api_client import ApiClientError
 from PySide6.QtWidgets import (
     QDialog,
     QFormLayout,
@@ -9,8 +10,6 @@ from PySide6.QtWidgets import (
     QPushButton,
     QVBoxLayout,
 )
-
-from core.api_client import ApiClientError
 from services.auth_service import AuthService
 
 
