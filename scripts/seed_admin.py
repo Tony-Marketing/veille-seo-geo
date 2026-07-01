@@ -9,6 +9,24 @@ PERMISSIONS = [
     ("website.read", "Lire les sites", "website"),
     ("website.write", "Modifier les sites", "website"),
     ("website.delete", "Supprimer les sites", "website"),
+    ("entity.read", "Lire les entites", "entity"),
+    ("entity.write", "Modifier les entites", "entity"),
+    ("entity.delete", "Supprimer les entites", "entity"),
+    ("keyword.read", "Lire les mots-cles", "keyword"),
+    ("keyword.write", "Modifier les mots-cles", "keyword"),
+    ("keyword.delete", "Supprimer les mots-cles", "keyword"),
+    ("competitor.read", "Lire les concurrents", "competitor"),
+    ("competitor.write", "Modifier les concurrents", "competitor"),
+    ("competitor.delete", "Supprimer les concurrents", "competitor"),
+    ("url.read", "Lire les URLs", "url"),
+    ("url.write", "Modifier les URLs", "url"),
+    ("url.delete", "Supprimer les URLs", "url"),
+    ("report.read", "Lire les rapports", "report"),
+    ("report.write", "Modifier les rapports", "report"),
+    ("report.delete", "Supprimer les rapports", "report"),
+    ("project_task.read", "Lire les taches projet", "project_task"),
+    ("project_task.write", "Modifier les taches projet", "project_task"),
+    ("project_task.delete", "Supprimer les taches projet", "project_task"),
     ("user.read", "Lire les utilisateurs", "user"),
     ("user.write", "Modifier les utilisateurs", "user"),
     ("admin.read", "Lire l'administration", "admin"),
@@ -21,6 +39,9 @@ PERMISSIONS = [
     ("settings.write", "Modifier les paramètres", "settings"),
     ("logs.read", "Lire les journaux", "logs"),
 ]
+
+BUSINESS_MODULES = {"website", "entity", "keyword", "competitor", "url", "report", "project_task"}
+ADMIN_BUSINESS_PERMISSION_CODES = {code for code, _label, module in PERMISSIONS if module in BUSINESS_MODULES}
 
 ROLES = [
     ("Administrateur", "Accès complet à la plateforme"),
@@ -44,6 +65,16 @@ def run_seed(db: Session) -> None:
     for name, description in ROLES:
         if db.query(Role).filter(Role.name == name).first() is None:
             db.add(Role(name=name, description=description, is_system=True))
+
+    db.flush()
+
+    admin_role = db.query(Role).filter(Role.name == "Administrateur").first()
+    if admin_role is not None:
+        existing_codes = {permission.code for permission in admin_role.permissions}
+        for code in sorted(ADMIN_BUSINESS_PERMISSION_CODES - existing_codes):
+            permission = db.query(Permission).filter(Permission.code == code).first()
+            if permission is not None:
+                admin_role.permissions.append(permission)
 
     for name in AI_PROVIDERS:
         if db.query(AiProvider).filter(AiProvider.name == name).first() is None:

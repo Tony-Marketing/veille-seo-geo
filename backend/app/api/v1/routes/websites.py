@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.orm import Session
 
 from backend.app.core.database import get_db
+from backend.app.core.security import require_permission
 from backend.app.repositories.websites import WebsiteRepository
 from backend.app.schemas.pagination import PaginationParams, pagination_params
 from backend.app.schemas.websites import WebsiteCreate, WebsiteList, WebsiteRead, WebsiteUpdate
@@ -23,6 +24,7 @@ def get_service(db: Session = Depends(get_db)) -> WebsiteService:
 @router.get(
     "",
     response_model=WebsiteList,
+    dependencies=[Depends(require_permission("website.read"))],
     summary="Lister Sites",
     description="Retourne une liste paginee avec recherche, tri et filtre actif.",
 )
@@ -39,6 +41,7 @@ def list_websites(
 @router.get(
     "/{item_id}",
     response_model=WebsiteRead,
+    dependencies=[Depends(require_permission("website.read"))],
     summary="Consulter Sites",
     description="Retourne un site par identifiant.",
 )
@@ -52,6 +55,7 @@ def get_website(item_id: int, service: WebsiteService = Depends(get_service)) ->
     "",
     response_model=WebsiteRead,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_permission("website.write"))],
     summary="Creer Sites",
     description="Cree un nouveau site.",
 )
@@ -64,6 +68,7 @@ def create_website(payload: WebsiteCreate, service: WebsiteService = Depends(get
 @router.put(
     "/{item_id}",
     response_model=WebsiteRead,
+    dependencies=[Depends(require_permission("website.write"))],
     summary="Modifier Sites",
     description="Met a jour un site existant.",
 )
@@ -80,6 +85,7 @@ def update_website(
 @router.delete(
     "/{item_id}",
     status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_permission("website.delete"))],
     summary="Supprimer Sites",
     description="Supprime un site existant.",
 )

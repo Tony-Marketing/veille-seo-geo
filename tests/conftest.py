@@ -1,8 +1,9 @@
 """Configuration Pytest."""
 
 import sys
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from pathlib import Path
+from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
@@ -13,7 +14,7 @@ from sqlalchemy.pool import StaticPool
 from backend.app.core.database import Base, get_db
 from backend.app.core.security import create_access_token, hash_password
 from backend.app.main import app
-from backend.app.models import User
+from backend.app.models import Permission, Role, User
 
 DESKTOP_PATH = Path(__file__).resolve().parents[1] / "desktop"
 if str(DESKTOP_PATH) not in sys.path:
@@ -76,3 +77,35 @@ def admin_headers(admin_user: User) -> dict[str, str]:
 
     token = create_access_token(str(admin_user.id))
     return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture()
+def auth_headers_for(db_session: Session) -> Callable[..., dict[str, str]]:
+    """Return headers for a generated user with optional permissions."""
+
+    def factory(*, permission_codes: list[str] | None = None, is_superadmin: bool = False) -> dict[str, str]:
+        suffix = uuid4().hex
+        user = User(
+            email=f"user-{suffix}@example.com",
+            password_hash=hash_password("Password123"),
+            is_active=True,
+            is_superadmin=is_superadmin,
+        )
+
+        if permission_codes:
+            role = Role(name=f"role-{suffix}", description="Role de test")
+            for code in permission_codes:
+                permission = db_session.query(Permission).filter(Permission.code == code).first()
+                if permission is None:
+                    permission = Permission(code=code, label=code, module=code.split(".", maxsplit=1)[0])
+                    db_session.add(permission)
+                role.permissions.append(permission)
+            user.roles.append(role)
+
+        db_session.add(user)
+        db_session.commit()
+        db_session.refresh(user)
+        token = create_access_token(str(user.id))
+        return {"Authorization": f"Bearer {token}"}
+
+    return factory

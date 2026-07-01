@@ -21,6 +21,11 @@ def create_crud_router(
     read_schema: type[BaseModel],
     list_schema: type[BaseModel],
     dependencies: list[Any] | None = None,
+    list_dependencies: list[Any] | None = None,
+    get_dependencies: list[Any] | None = None,
+    create_dependencies: list[Any] | None = None,
+    update_dependencies: list[Any] | None = None,
+    delete_dependencies: list[Any] | None = None,
 ) -> APIRouter:
     """Create a standard CRUD router for simple resources."""
 
@@ -34,6 +39,7 @@ def create_crud_router(
     @router.get(
         "",
         response_model=list_schema,
+        dependencies=list_dependencies,
         summary=f"Lister {tags[0]}",
         description="Retourne une liste paginée avec recherche et tri.",
     )
@@ -46,6 +52,7 @@ def create_crud_router(
     @router.get(
         "/{item_id}",
         response_model=read_schema,
+        dependencies=get_dependencies,
         summary=f"Consulter {tags[0]}",
         description="Retourne une ressource par identifiant.",
     )
@@ -56,6 +63,7 @@ def create_crud_router(
         "",
         response_model=read_schema,
         status_code=status.HTTP_201_CREATED,
+        dependencies=create_dependencies,
         summary=f"Créer {tags[0]}",
         description="Crée une nouvelle ressource.",
     )
@@ -65,6 +73,7 @@ def create_crud_router(
     @router.put(
         "/{item_id}",
         response_model=read_schema,
+        dependencies=update_dependencies,
         summary=f"Modifier {tags[0]}",
         description="Met à jour une ressource existante.",
     )
@@ -78,6 +87,7 @@ def create_crud_router(
     @router.delete(
         "/{item_id}",
         status_code=status.HTTP_204_NO_CONTENT,
+        dependencies=delete_dependencies,
         summary=f"Supprimer {tags[0]}",
         description="Supprime une ressource existante.",
     )
