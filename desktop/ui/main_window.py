@@ -107,7 +107,7 @@ class MainWindow(QMainWindow):
         return {
             PAGE_DASHBOARD: DashboardPage(self.api_client),
             PAGE_WEBSITES: WebsitesPage(self.api_client),
-            PAGE_ENTITIES: EntitiesPage(),
+            PAGE_ENTITIES: EntitiesPage(self.api_client),
             PAGE_KEYWORDS: KeywordsPage(),
             PAGE_COMPETITORS: CompetitorsPage(),
             PAGE_REPORTS: ReportsPage(),
