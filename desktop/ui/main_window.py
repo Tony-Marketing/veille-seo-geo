@@ -109,7 +109,7 @@ class MainWindow(QMainWindow):
             PAGE_WEBSITES: WebsitesPage(self.api_client),
             PAGE_ENTITIES: EntitiesPage(self.api_client),
             PAGE_KEYWORDS: KeywordsPage(self.api_client),
-            PAGE_COMPETITORS: CompetitorsPage(),
+            PAGE_COMPETITORS: CompetitorsPage(self.api_client),
             PAGE_REPORTS: ReportsPage(),
             PAGE_ADMINISTRATION: AdministrationPage(),
         }
