@@ -1,4 +1,4 @@
-"""Service Desktop de consultation des sites Web."""
+"""Service Desktop de gestion des sites Web."""
 
 from dataclasses import dataclass
 from typing import Any, Literal
@@ -6,7 +6,16 @@ from typing import Any, Literal
 import httpx
 from core.api_client import ApiClient, ApiClientError
 
-WebsiteErrorCode = Literal["unauthorized", "forbidden", "backend_unavailable", "network_error", "unexpected"]
+WebsiteErrorCode = Literal[
+    "unauthorized",
+    "forbidden",
+    "not_found",
+    "conflict",
+    "validation_error",
+    "backend_unavailable",
+    "network_error",
+    "unexpected",
+]
 
 
 @dataclass(frozen=True)
@@ -21,7 +30,7 @@ class PaginatedWebsites:
 
 
 class WebsitesServiceError(RuntimeError):
-    """Readable error raised when websites cannot be loaded."""
+    """Readable error raised when websites cannot be managed."""
 
     def __init__(
         self,
@@ -38,7 +47,7 @@ class WebsitesServiceError(RuntimeError):
 
 
 class WebsitesService:
-    """Load websites through the REST API client."""
+    """Manage websites through the REST API client."""
 
     DEFAULT_PAGE = 1
     DEFAULT_PAGE_SIZE = 100
@@ -68,6 +77,34 @@ class WebsitesService:
                 details={"error": str(exc)},
             ) from exc
 
+    def create_website(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Create a website through the REST API."""
+
+        try:
+            response = self.api_client.post("/websites", json=payload)
+        except ApiClientError as exc:
+            raise self._to_service_error(exc) from exc
+
+        return self._parse_website_response(response)
+
+    def update_website(self, website_id: int, payload: dict[str, Any]) -> dict[str, Any]:
+        """Update a website through the REST API."""
+
+        try:
+            response = self.api_client.put(f"/websites/{website_id}", json=payload)
+        except ApiClientError as exc:
+            raise self._to_service_error(exc) from exc
+
+        return self._parse_website_response(response)
+
+    def delete_website(self, website_id: int) -> None:
+        """Delete a website through the REST API."""
+
+        try:
+            self.api_client.delete(f"/websites/{website_id}")
+        except ApiClientError as exc:
+            raise self._to_service_error(exc) from exc
+
     def _parse_paginated_response(self, payload: Any) -> PaginatedWebsites:
         """Validate and normalize the paginated websites response."""
 
@@ -91,20 +128,52 @@ class WebsitesService:
             pages=int(payload["pages"]),
         )
 
+    def _parse_website_response(self, payload: Any) -> dict[str, Any]:
+        """Validate and normalize a single website response."""
+
+        if not isinstance(payload, dict):
+            raise WebsitesServiceError(
+                "Reponse API inattendue : le site retourne n'est pas un objet.",
+                code="unexpected",
+                details={"payload": payload},
+            )
+        return payload
+
     def _to_service_error(self, exc: ApiClientError) -> WebsitesServiceError:
         """Convert low-level API errors to websites service errors."""
 
         if exc.status_code == 401:
             return WebsitesServiceError(
-                "Authentification requise pour charger les sites.",
+                "Authentification requise pour gerer les sites.",
                 code="unauthorized",
                 status_code=exc.status_code,
                 details=exc.details,
             )
         if exc.status_code == 403:
             return WebsitesServiceError(
-                "Permission insuffisante pour consulter les sites.",
+                "Permission insuffisante pour gerer les sites.",
                 code="forbidden",
+                status_code=exc.status_code,
+                details=exc.details,
+            )
+        if exc.status_code == 404:
+            return WebsitesServiceError(
+                "Site introuvable.",
+                code="not_found",
+                status_code=exc.status_code,
+                details=exc.details,
+            )
+        if exc.status_code == 409:
+            return WebsitesServiceError(
+                "Un site avec ces informations existe deja.",
+                code="conflict",
+                status_code=exc.status_code,
+                details=exc.details,
+            )
+        if exc.status_code == 422:
+            return WebsitesServiceError(
+                "Les donnees envoyees sont invalides.",
+                code="validation_error",
                 status_code=exc.status_code,
                 details=exc.details,
             )
