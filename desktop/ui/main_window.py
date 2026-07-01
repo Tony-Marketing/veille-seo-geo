@@ -11,6 +11,7 @@ from core.constants import (
     PAGE_ENTITIES,
     PAGE_KEYWORDS,
     PAGE_REPORTS,
+    PAGE_URLS,
     PAGE_WEBSITES,
 )
 from core.session import DesktopSession
@@ -23,6 +24,7 @@ from ui.entities_page import EntitiesPage
 from ui.keywords_page import KeywordsPage
 from ui.login_dialog import LoginDialog
 from ui.reports_page import ReportsPage
+from ui.urls_page import URLsPage
 from ui.websites_page import WebsitesPage
 from widgets.sidebar import Sidebar
 from widgets.statusbar import StatusBar
@@ -110,6 +112,7 @@ class MainWindow(QMainWindow):
             PAGE_ENTITIES: EntitiesPage(self.api_client),
             PAGE_KEYWORDS: KeywordsPage(self.api_client),
             PAGE_COMPETITORS: CompetitorsPage(self.api_client),
+            PAGE_URLS: URLsPage(self.api_client),
             PAGE_REPORTS: ReportsPage(),
             PAGE_ADMINISTRATION: AdministrationPage(),
         }
