@@ -113,7 +113,7 @@ class MainWindow(QMainWindow):
             PAGE_KEYWORDS: KeywordsPage(self.api_client),
             PAGE_COMPETITORS: CompetitorsPage(self.api_client),
             PAGE_PROJECT_TASKS: ProjectTasksPage(self.api_client),
-            PAGE_REPORTS: ReportsPage(),
+            PAGE_REPORTS: ReportsPage(self.api_client),
             PAGE_ADMINISTRATION: AdministrationPage(),
         }
 
