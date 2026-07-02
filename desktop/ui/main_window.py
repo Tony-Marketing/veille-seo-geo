@@ -7,6 +7,7 @@ from core.config import APP_NAME
 from core.constants import (
     PAGE_ADMINISTRATION,
     PAGE_COMPETITORS,
+    PAGE_CRAWLS,
     PAGE_DASHBOARD,
     PAGE_ENTITIES,
     PAGE_KEYWORDS,
@@ -19,6 +20,7 @@ from PySide6.QtWidgets import QDialog, QHBoxLayout, QMainWindow, QStackedWidget,
 from services.auth_service import AuthService
 from ui.administration_page import AdministrationPage
 from ui.competitors_page import CompetitorsPage
+from ui.crawls_page import CrawlsPage
 from ui.dashboard_page import DashboardPage
 from ui.entities_page import EntitiesPage
 from ui.keywords_page import KeywordsPage
@@ -112,6 +114,7 @@ class MainWindow(QMainWindow):
             PAGE_ENTITIES: EntitiesPage(self.api_client),
             PAGE_KEYWORDS: KeywordsPage(self.api_client),
             PAGE_COMPETITORS: CompetitorsPage(self.api_client),
+            PAGE_CRAWLS: CrawlsPage(self.api_client),
             PAGE_PROJECT_TASKS: ProjectTasksPage(self.api_client),
             PAGE_REPORTS: ReportsPage(),
             PAGE_ADMINISTRATION: AdministrationPage(),
