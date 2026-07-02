@@ -6,6 +6,7 @@ from backend.app.api.v1.routes import (
     admin,
     auth,
     competitors,
+    crawls,
     entities,
     keywords,
     permissions,
@@ -25,6 +26,7 @@ api_router.include_router(permissions.router)
 api_router.include_router(entities.router)
 api_router.include_router(websites.router)
 api_router.include_router(competitors.router)
+api_router.include_router(crawls.router)
 api_router.include_router(keywords.router)
 api_router.include_router(urls.router)
 api_router.include_router(reports.router)

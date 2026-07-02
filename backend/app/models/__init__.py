@@ -10,6 +10,7 @@ from backend.app.models.admin import (
     SystemParameter,
 )
 from backend.app.models.auth import Permission, Role, User, role_permissions, user_roles
+from backend.app.models.crawls import CrawlPage, CrawlSession
 from backend.app.models.entities import Competitor, Entity, Keyword, ProjectTask, Report, Url, Website
 
 __all__ = [
@@ -19,6 +20,8 @@ __all__ = [
     "ApplicationSetting",
     "AuditLog",
     "Competitor",
+    "CrawlPage",
+    "CrawlSession",
     "Entity",
     "ErrorLog",
     "Keyword",
