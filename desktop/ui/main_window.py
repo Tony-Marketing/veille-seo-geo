@@ -10,6 +10,7 @@ from core.constants import (
     PAGE_DASHBOARD,
     PAGE_ENTITIES,
     PAGE_KEYWORDS,
+    PAGE_PROJECT_TASKS,
     PAGE_REPORTS,
     PAGE_WEBSITES,
 )
@@ -22,6 +23,7 @@ from ui.dashboard_page import DashboardPage
 from ui.entities_page import EntitiesPage
 from ui.keywords_page import KeywordsPage
 from ui.login_dialog import LoginDialog
+from ui.project_tasks_page import ProjectTasksPage
 from ui.reports_page import ReportsPage
 from ui.websites_page import WebsitesPage
 from widgets.sidebar import Sidebar
@@ -110,6 +112,7 @@ class MainWindow(QMainWindow):
             PAGE_ENTITIES: EntitiesPage(self.api_client),
             PAGE_KEYWORDS: KeywordsPage(self.api_client),
             PAGE_COMPETITORS: CompetitorsPage(self.api_client),
+            PAGE_PROJECT_TASKS: ProjectTasksPage(self.api_client),
             PAGE_REPORTS: ReportsPage(),
             PAGE_ADMINISTRATION: AdministrationPage(),
         }
