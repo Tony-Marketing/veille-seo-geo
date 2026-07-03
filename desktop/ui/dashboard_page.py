@@ -17,6 +17,7 @@ class DashboardPage(QWidget):
         self.api_client = api_client
         self.backend_status = QLabel()
         self.backend_status.setObjectName("ValueLabel")
+        self.backend_status.setText("Backend : non verifie")
 
         title = QLabel("Bienvenue")
         title.setObjectName("PageTitle")
@@ -39,8 +40,6 @@ class DashboardPage(QWidget):
         layout.addWidget(self.backend_status)
         layout.addWidget(self.user_label)
         layout.addStretch()
-
-        self.refresh_backend_status()
 
     def refresh_backend_status(self) -> None:
         """Refresh backend availability information."""
