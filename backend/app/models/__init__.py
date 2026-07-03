@@ -12,6 +12,7 @@ from backend.app.models.admin import (
 from backend.app.models.auth import Permission, Role, User, role_permissions, user_roles
 from backend.app.models.crawls import CrawlPage, CrawlSession
 from backend.app.models.entities import Competitor, Entity, Keyword, ProjectTask, Report, Url, Website
+from backend.app.models.seo_analysis import SeoAnalysis, SeoAnalysisIssue, SeoPageAnalysis
 
 __all__ = [
     "AiModel",
@@ -29,6 +30,9 @@ __all__ = [
     "ProjectTask",
     "Report",
     "Role",
+    "SeoAnalysis",
+    "SeoAnalysisIssue",
+    "SeoPageAnalysis",
     "SystemParameter",
     "Url",
     "User",

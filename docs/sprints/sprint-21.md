@@ -610,52 +610,47 @@ schema de base de donnees.
 Endpoints prevus, sans implementation dans ce document :
 
 ```text
-POST /seo-analysis/run/{crawl_id}
-GET /seo-analysis/{crawl_id}
-GET /seo-analysis/page/{page_id}
-DELETE /seo-analysis/{crawl_id}
+POST /seo-analysis
+GET /seo-analysis
+GET /seo-analysis/{analysis_id}
+DELETE /seo-analysis/{analysis_id}
 ```
 
-### POST /seo-analysis/run/{crawl_id}
+### POST /seo-analysis
 
 Role :
 
-- lancer l'analyse SEO technique d'une session de crawl ;
-- lire les pages crawlees ;
-- produire les resultats page par page ;
-- calculer les scores ;
-- persister la synthese.
+- creer une analyse SEO en etat `PENDING` ;
+- utiliser le `crawl_id` fourni dans le body de la requete ;
+- ne pas lancer le moteur SEO durant la Phase 1.
 
 Comportements attendus :
 
 - retourner `404` si le crawl n'existe pas ;
-- retourner `409` si une analyse est deja en cours ;
-- permettre de remplacer ou recalculer une analyse existante selon une regle explicite ;
-- retourner un etat de progression ou un resultat final selon le mode retenu.
+- permettre plusieurs analyses pour un meme crawl si cette evolution est retenue.
 
-### GET /seo-analysis/{crawl_id}
+### GET /seo-analysis
 
 Role :
 
-- retourner la synthese SEO d'un crawl ;
-- retourner les agregats par famille ;
-- retourner les distributions de score ;
-- retourner le nombre d'erreurs critiques, majeures, moyennes et mineures.
+- lister les analyses SEO existantes ;
+- retourner leur etat d'execution ;
+- permettre le suivi de progression.
 
-### GET /seo-analysis/page/{page_id}
-
-Role :
-
-- retourner le detail SEO d'une page crawlee ;
-- afficher les balises detectees ;
-- afficher les anomalies ;
-- afficher le score global et les scores par famille.
-
-### DELETE /seo-analysis/{crawl_id}
+### GET /seo-analysis/{analysis_id}
 
 Role :
 
-- supprimer les resultats SEO rattaches a une session de crawl ;
+- retourner une analyse SEO par son identifiant ;
+- utiliser `analysis_id` pour identifier l'analyse ;
+- ne pas utiliser `crawl_id` pour consulter une analyse existante.
+
+### DELETE /seo-analysis/{analysis_id}
+
+Role :
+
+- supprimer une analyse SEO par son identifiant ;
+- utiliser `analysis_id` pour identifier l'analyse ;
 - ne pas supprimer la session de crawl ;
 - ne pas supprimer les pages crawlees.
 
