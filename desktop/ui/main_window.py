@@ -1,5 +1,6 @@
 """Fenetre principale du client Desktop."""
 
+from collections.abc import Callable
 from typing import Any
 
 from core.api_client import ApiClient
@@ -48,10 +49,8 @@ class MainWindow(QMainWindow):
         self.auth_service = AuthService(self.api_client, self.session)
         self.stack = QStackedWidget()
         self.status_bar = StatusBar()
-        self.pages = self._build_pages()
-
-        for page in self.pages.values():
-            self.stack.addWidget(page)
+        self.pages: dict[str, QWidget] = {}
+        self.page_factories = self._build_page_factories()
 
         self.sidebar = Sidebar(self.show_page)
         self.topbar = TopBar(on_logout=self.logout)
@@ -86,16 +85,32 @@ class MainWindow(QMainWindow):
                 self.sidebar.select_page(PAGE_DASHBOARD)
                 return
 
-        page = self.pages.get(page_name)
+        page = self.get_page(page_name)
         if page is None:
             return
 
         self.stack.setCurrentWidget(page)
         self.status_bar.set_message(f"Module actif : {page_name}")
 
-        if page_name == PAGE_DASHBOARD and isinstance(page, DashboardPage):
+        if page_name == PAGE_DASHBOARD and isinstance(page, DashboardPage) and self.session.is_authenticated:
             page.refresh_backend_status()
             page.set_user(self.session.user)
+
+    def get_page(self, page_name: str) -> QWidget | None:
+        """Return a page, creating it only on first access."""
+
+        page = self.pages.get(page_name)
+        if page is not None:
+            return page
+
+        factory = self.page_factories.get(page_name)
+        if factory is None:
+            return None
+
+        page = factory()
+        self.pages[page_name] = page
+        self.stack.addWidget(page)
+        return page
 
     def logout(self) -> None:
         """Clear the session and return to the dashboard."""
@@ -105,19 +120,19 @@ class MainWindow(QMainWindow):
         self.sidebar.select_page(PAGE_DASHBOARD)
         self.status_bar.set_message("Session fermee.")
 
-    def _build_pages(self) -> dict[str, QWidget]:
-        """Create every page available in the shell."""
+    def _build_page_factories(self) -> dict[str, Callable[[], QWidget]]:
+        """Return page factories used for lazy page creation."""
 
         return {
-            PAGE_DASHBOARD: DashboardPage(self.api_client),
-            PAGE_WEBSITES: WebsitesPage(self.api_client),
-            PAGE_ENTITIES: EntitiesPage(self.api_client),
-            PAGE_KEYWORDS: KeywordsPage(self.api_client),
-            PAGE_COMPETITORS: CompetitorsPage(self.api_client),
-            PAGE_CRAWLS: CrawlsPage(self.api_client),
-            PAGE_PROJECT_TASKS: ProjectTasksPage(self.api_client),
-            PAGE_REPORTS: ReportsPage(),
-            PAGE_ADMINISTRATION: AdministrationPage(),
+            PAGE_DASHBOARD: lambda: DashboardPage(self.api_client),
+            PAGE_WEBSITES: lambda: WebsitesPage(self.api_client),
+            PAGE_ENTITIES: lambda: EntitiesPage(self.api_client),
+            PAGE_KEYWORDS: lambda: KeywordsPage(self.api_client),
+            PAGE_COMPETITORS: lambda: CompetitorsPage(self.api_client),
+            PAGE_CRAWLS: lambda: CrawlsPage(self.api_client),
+            PAGE_PROJECT_TASKS: lambda: ProjectTasksPage(self.api_client),
+            PAGE_REPORTS: ReportsPage,
+            PAGE_ADMINISTRATION: AdministrationPage,
         }
 
     def _show_login_dialog(self) -> bool:
@@ -144,6 +159,8 @@ class MainWindow(QMainWindow):
 
         dashboard = self.pages.get(PAGE_DASHBOARD)
         if isinstance(dashboard, DashboardPage):
+            if self.session.is_authenticated:
+                dashboard.refresh_backend_status()
             dashboard.set_user(self.session.user)
 
     def _user_label(self, user: dict[str, Any] | None) -> str:
