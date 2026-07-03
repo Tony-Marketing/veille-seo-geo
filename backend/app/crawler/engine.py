@@ -38,6 +38,7 @@ class CrawlPageResult:
     depth: int
     status_code: int | None
     content_type: str | None
+    raw_html: str | None
     is_redirect: bool
     redirect_url: str | None
     redirect_count: int
@@ -202,6 +203,7 @@ class CrawlerEngine:
             final_normalized_url = self.normalizer.normalize(fetched.final_url)
 
         links_found = len(self.extractor.extract(fetched.text)) if fetched.is_html and not fetched.error_message else 0
+        raw_html = fetched.text if fetched.is_html and fetched.error_message is None else None
         return CrawlPageResult(
             url=item.url,
             normalized_url=item.normalized_url,
@@ -210,6 +212,7 @@ class CrawlerEngine:
             depth=item.depth,
             status_code=fetched.status_code,
             content_type=fetched.content_type,
+            raw_html=raw_html,
             is_redirect=fetched.is_redirect,
             redirect_url=fetched.redirect_url,
             redirect_count=fetched.redirect_count,

@@ -208,6 +208,7 @@ class CrawlService:
                 "depth": page.depth,
                 "status_code": page.status_code,
                 "content_type": page.content_type,
+                "raw_html": page.raw_html,
                 "is_redirect": page.is_redirect,
                 "redirect_url": page.redirect_url,
                 "redirect_count": page.redirect_count,

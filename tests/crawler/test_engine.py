@@ -54,6 +54,7 @@ def test_engine_discovers_internal_links_and_removes_duplicates() -> None:
     assert result.processed_count == 2
     assert fetcher.urls == ["https://example.com/", "https://example.com/a"]
     assert [page.normalized_url for page in pages] == ["https://example.com/", "https://example.com/a"]
+    assert pages[0].raw_html is not None
 
 
 def test_engine_respects_max_pages() -> None:
