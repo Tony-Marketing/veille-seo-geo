@@ -12,6 +12,7 @@ from backend.app.models.admin import (
 from backend.app.models.auth import Permission, Role, User, role_permissions, user_roles
 from backend.app.models.crawls import CrawlPage, CrawlSession
 from backend.app.models.entities import Competitor, Entity, Keyword, ProjectTask, Report, Url, Website
+from backend.app.models.geo_analysis import GeoAnalysis, GeoProviderResult, GeoRecommendation
 from backend.app.models.seo_analysis import SeoAnalysis, SeoAnalysisIssue, SeoPageAnalysis
 
 __all__ = [
@@ -25,6 +26,9 @@ __all__ = [
     "CrawlSession",
     "Entity",
     "ErrorLog",
+    "GeoAnalysis",
+    "GeoProviderResult",
+    "GeoRecommendation",
     "Keyword",
     "Permission",
     "ProjectTask",
