@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from backend.app.models import CrawlPage, SeoAnalysis, SeoAnalysisIssue, SeoPageAnalysis
@@ -29,6 +29,23 @@ class SeoAnalysisRepository(BaseRepository[SeoAnalysis]):
 
         statement = select(func.count()).select_from(CrawlPage).where(CrawlPage.crawl_session_id == crawl_session_id)
         return int(self.db.scalar(statement) or 0)
+
+    def list_crawl_pages(self, crawl_session_id: int) -> list[CrawlPage]:
+        """Return crawl pages to analyze for one crawl session."""
+
+        statement = (
+            select(CrawlPage)
+            .where(CrawlPage.crawl_session_id == crawl_session_id)
+            .order_by(CrawlPage.depth.asc(), CrawlPage.id.asc())
+        )
+        return list(self.db.scalars(statement))
+
+    def clear_results(self, analysis_id: int) -> None:
+        """Delete page analyses and issues attached to an analysis."""
+
+        self.db.execute(delete(SeoAnalysisIssue).where(SeoAnalysisIssue.seo_analysis_id == analysis_id))
+        self.db.execute(delete(SeoPageAnalysis).where(SeoPageAnalysis.seo_analysis_id == analysis_id))
+        self.db.commit()
 
     def create_page_analysis(self, data: dict[str, Any]) -> SeoPageAnalysis:
         """Persist one SEO page analysis placeholder."""
@@ -64,4 +81,3 @@ class SeoAnalysisRepository(BaseRepository[SeoAnalysis]):
             statement = statement.order_by(self.model.id.desc())
         statement = statement.offset(params.offset).limit(params.page_size)
         return list(self.db.scalars(statement)), int(self.db.scalar(count_statement) or 0)
-
