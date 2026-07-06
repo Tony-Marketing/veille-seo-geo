@@ -13,6 +13,15 @@ from backend.app.models.auth import Permission, Role, User, role_permissions, us
 from backend.app.models.crawls import CrawlPage, CrawlSession
 from backend.app.models.entities import Competitor, Entity, Keyword, ProjectTask, Report, Url, Website
 from backend.app.models.geo_analysis import GeoAnalysis, GeoProviderResult, GeoRecommendation
+from backend.app.models.gsc import (
+    GscCoverageSnapshot,
+    GscImportRun,
+    GscIndexingInspection,
+    GscOAuthCredential,
+    GscPerformanceDaily,
+    GscProperty,
+    GscSitemap,
+)
 from backend.app.models.seo_analysis import SeoAnalysis, SeoAnalysisIssue, SeoPageAnalysis
 
 __all__ = [
@@ -29,6 +38,13 @@ __all__ = [
     "GeoAnalysis",
     "GeoProviderResult",
     "GeoRecommendation",
+    "GscCoverageSnapshot",
+    "GscImportRun",
+    "GscIndexingInspection",
+    "GscOAuthCredential",
+    "GscPerformanceDaily",
+    "GscProperty",
+    "GscSitemap",
     "Keyword",
     "Permission",
     "ProjectTask",

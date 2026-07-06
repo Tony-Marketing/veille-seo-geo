@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     api_key_encryption_secret: str | None = None
     exports_directory: str = "exports"
     backups_directory: str = "backups"
+    google_oauth_client_id: str | None = None
+    google_oauth_client_secret: str | None = None
+    google_oauth_redirect_uri: str = "http://localhost:8000/api/v1/gsc/oauth/callback"
+    google_search_console_scopes: str = "https://www.googleapis.com/auth/webmasters.readonly"
 
 
 @lru_cache
