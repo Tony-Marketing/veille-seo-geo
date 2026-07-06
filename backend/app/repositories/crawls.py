@@ -50,6 +50,34 @@ class CrawlRepository(BaseRepository[CrawlSession]):
         statement = statement.offset(params.offset).limit(params.page_size)
         return list(self.db.scalars(statement)), int(self.db.scalar(count_statement) or 0)
 
+    def get_latest(self, website_id: int | None = None) -> CrawlSession | None:
+        """Return the latest crawl session, optionally filtered by website."""
+
+        statement = select(CrawlSession)
+        if website_id is not None:
+            statement = statement.where(CrawlSession.website_id == website_id)
+        statement = statement.order_by(CrawlSession.id.desc()).limit(1)
+        return self.db.scalar(statement)
+
+    def count_pages_for_session(self, session_id: int) -> int:
+        """Return number of crawled pages for one session."""
+
+        statement = select(func.count()).select_from(CrawlPage).where(CrawlPage.crawl_session_id == session_id)
+        return int(self.db.scalar(statement) or 0)
+
+    def count_failed_pages_for_session(self, session_id: int) -> int:
+        """Return number of failed pages for one session."""
+
+        statement = (
+            select(func.count())
+            .select_from(CrawlPage)
+            .where(
+                CrawlPage.crawl_session_id == session_id,
+                (CrawlPage.error_message.is_not(None)) | (CrawlPage.status_code >= 400),
+            )
+        )
+        return int(self.db.scalar(statement) or 0)
+
     def is_cancel_requested(self, session_id: int) -> bool:
         """Return whether a crawl session has received a cancel request."""
 

@@ -41,6 +41,22 @@ class GeoAnalysisRepository(BaseRepository[GeoAnalysis]):
 
         return self.db.get(SeoAnalysis, seo_analysis_id)
 
+    def get_latest_completed_or_partial(
+        self,
+        *,
+        crawl_session_id: int | None = None,
+        seo_analysis_id: int | None = None,
+    ) -> GeoAnalysis | None:
+        """Return the latest usable GEO analysis."""
+
+        statement = select(GeoAnalysis).where(GeoAnalysis.status.in_(("COMPLETED", "PARTIAL")))
+        if crawl_session_id is not None:
+            statement = statement.where(GeoAnalysis.crawl_session_id == crawl_session_id)
+        if seo_analysis_id is not None:
+            statement = statement.where(GeoAnalysis.seo_analysis_id == seo_analysis_id)
+        statement = statement.order_by(GeoAnalysis.id.desc()).limit(1)
+        return self.db.scalar(statement)
+
     def count_seo_pages(self, seo_analysis_id: int) -> int:
         """Return number of page analyses attached to one SEO analysis."""
 
@@ -74,6 +90,28 @@ class GeoAnalysisRepository(BaseRepository[GeoAnalysis]):
             .order_by(SeoAnalysisIssue.severity.asc(), SeoAnalysisIssue.id.asc())
         )
         return list(self.db.scalars(statement))
+
+    def list_provider_results_with_pages(self, analysis_id: int) -> list[tuple[GeoProviderResult, CrawlPage | None]]:
+        """Return GEO provider results with their crawled pages when available."""
+
+        statement = (
+            select(GeoProviderResult, CrawlPage)
+            .join(CrawlPage, CrawlPage.id == GeoProviderResult.crawl_page_id, isouter=True)
+            .where(GeoProviderResult.geo_analysis_id == analysis_id)
+            .order_by(GeoProviderResult.id.asc())
+        )
+        return [(row[0], row[1]) for row in self.db.execute(statement).all()]
+
+    def list_recommendations_with_pages(self, analysis_id: int) -> list[tuple[GeoRecommendation, CrawlPage | None]]:
+        """Return GEO recommendations with their crawled pages when available."""
+
+        statement = (
+            select(GeoRecommendation, CrawlPage)
+            .join(CrawlPage, CrawlPage.id == GeoRecommendation.crawl_page_id, isouter=True)
+            .where(GeoRecommendation.geo_analysis_id == analysis_id)
+            .order_by(GeoRecommendation.priority.asc(), GeoRecommendation.id.asc())
+        )
+        return [(row[0], row[1]) for row in self.db.execute(statement).all()]
 
     def clear_results(self, analysis_id: int) -> None:
         """Delete provider results and recommendations attached to an analysis."""
