@@ -11,6 +11,7 @@ from core.constants import (
     PAGE_CRAWLS,
     PAGE_DASHBOARD,
     PAGE_ENTITIES,
+    PAGE_GEO_ANALYSIS,
     PAGE_KEYWORDS,
     PAGE_PROJECT_TASKS,
     PAGE_REPORTS,
@@ -24,6 +25,7 @@ from ui.competitors_page import CompetitorsPage
 from ui.crawls_page import CrawlsPage
 from ui.dashboard_page import DashboardPage
 from ui.entities_page import EntitiesPage
+from ui.geo_analysis_page import GeoAnalysisPage
 from ui.keywords_page import KeywordsPage
 from ui.login_dialog import LoginDialog
 from ui.project_tasks_page import ProjectTasksPage
@@ -130,6 +132,7 @@ class MainWindow(QMainWindow):
             PAGE_KEYWORDS: lambda: KeywordsPage(self.api_client),
             PAGE_COMPETITORS: lambda: CompetitorsPage(self.api_client),
             PAGE_CRAWLS: lambda: CrawlsPage(self.api_client),
+            PAGE_GEO_ANALYSIS: lambda: GeoAnalysisPage(self.api_client),
             PAGE_PROJECT_TASKS: lambda: ProjectTasksPage(self.api_client),
             PAGE_REPORTS: ReportsPage,
             PAGE_ADMINISTRATION: AdministrationPage,
