@@ -24,6 +24,15 @@ class SeoAnalysisRepository(BaseRepository[SeoAnalysis]):
         statement = select(SeoAnalysis).where(SeoAnalysis.crawl_session_id == crawl_session_id)
         return list(self.db.scalars(statement))
 
+    def get_latest_completed(self, crawl_session_id: int | None = None) -> SeoAnalysis | None:
+        """Return the latest completed SEO analysis, optionally filtered by crawl."""
+
+        statement = select(SeoAnalysis).where(SeoAnalysis.status == "COMPLETED")
+        if crawl_session_id is not None:
+            statement = statement.where(SeoAnalysis.crawl_session_id == crawl_session_id)
+        statement = statement.order_by(SeoAnalysis.id.desc()).limit(1)
+        return self.db.scalar(statement)
+
     def count_crawl_pages(self, crawl_session_id: int) -> int:
         """Return number of crawled pages for a crawl session."""
 
@@ -37,6 +46,27 @@ class SeoAnalysisRepository(BaseRepository[SeoAnalysis]):
             select(CrawlPage)
             .where(CrawlPage.crawl_session_id == crawl_session_id)
             .order_by(CrawlPage.depth.asc(), CrawlPage.id.asc())
+        )
+        return list(self.db.scalars(statement))
+
+    def list_page_analyses_with_pages(self, analysis_id: int) -> list[tuple[SeoPageAnalysis, CrawlPage]]:
+        """Return SEO page analyses with their crawled pages."""
+
+        statement = (
+            select(SeoPageAnalysis, CrawlPage)
+            .join(CrawlPage, CrawlPage.id == SeoPageAnalysis.crawl_page_id)
+            .where(SeoPageAnalysis.seo_analysis_id == analysis_id)
+            .order_by(SeoPageAnalysis.id.asc())
+        )
+        return [(row[0], row[1]) for row in self.db.execute(statement).all()]
+
+    def list_issues_for_analysis(self, analysis_id: int) -> list[SeoAnalysisIssue]:
+        """Return SEO issues attached to one analysis."""
+
+        statement = (
+            select(SeoAnalysisIssue)
+            .where(SeoAnalysisIssue.seo_analysis_id == analysis_id)
+            .order_by(SeoAnalysisIssue.severity.asc(), SeoAnalysisIssue.id.asc())
         )
         return list(self.db.scalars(statement))
 
