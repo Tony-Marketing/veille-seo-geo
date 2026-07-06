@@ -12,6 +12,7 @@ from backend.app.crawler.engine import (
     CrawlProgress,
     CrawlRunResult,
 )
+from backend.app.models import CrawlPage
 from backend.app.repositories.crawls import CrawlRepository
 from backend.app.repositories.websites import WebsiteRepository
 from backend.app.schemas.crawls import CrawlCreate
@@ -32,6 +33,7 @@ class FakeEngine:
             depth=0,
             status_code=200,
             content_type="text/html",
+            raw_html="<html><title>Example</title></html>",
             is_redirect=False,
             redirect_url=None,
             redirect_count=0,
@@ -99,6 +101,9 @@ def test_crawl_service_starts_and_persists_pages(db_session: Session) -> None:
     assert result.pages_crawled == 1
     assert pages.total == 1
     assert pages.items[0].status_code == 200
+    persisted_page = db_session.query(CrawlPage).filter_by(crawl_session_id=created.id).one()
+    assert persisted_page.raw_html == "<html><title>Example</title></html>"
+    assert not hasattr(pages.items[0], "raw_html")
 
 
 def test_crawl_service_cancels_pending_session(db_session: Session) -> None:

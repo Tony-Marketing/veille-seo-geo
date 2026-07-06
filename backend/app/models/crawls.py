@@ -56,6 +56,7 @@ class CrawlPage(TimestampMixin, Base):
     depth: Mapped[int] = mapped_column(Integer, default=0, index=True, nullable=False)
     status_code: Mapped[int | None] = mapped_column(Integer, index=True)
     content_type: Mapped[str | None] = mapped_column(String(255))
+    raw_html: Mapped[str | None] = mapped_column(Text)
     is_redirect: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     redirect_url: Mapped[str | None] = mapped_column(String(1000))
     redirect_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
