@@ -20,6 +20,7 @@ from backend.app.schemas.google_search_console import (
     GoogleSearchConsoleIndexCoverageRead,
     GoogleSearchConsoleManualImportRequest,
     GoogleSearchConsoleOAuthTokenUpdate,
+    GoogleSearchConsolePerformanceFilters,
     GoogleSearchConsolePerformanceList,
     GoogleSearchConsolePerformanceRead,
     GoogleSearchConsolePropertyCreate,
@@ -35,6 +36,15 @@ from backend.app.schemas.pagination import PaginationParams
 class GoogleSearchConsoleService:
     """Manage Google Search Console properties, data and imports."""
 
+    SYNCED_IMPORT_STATUSES = (
+        GoogleSearchConsoleImportStatus.COMPLETED.value,
+        GoogleSearchConsoleImportStatus.PARTIAL.value,
+    )
+    VALID_INDEX_STATES = {"INDEXED", "VALID", "SUBMITTED_AND_INDEXED", "PASS"}
+    EXCLUDED_INDEX_STATES = {"EXCLUDED", "NOT_INDEXED", "BLOCKED", "REMOVED"}
+    ERROR_INDEX_STATES = {"ERROR", "FAIL", "FAILED"}
+    WARNING_INDEX_STATES = {"WARNING", "WARN", "PARTIAL"}
+
     def __init__(
         self,
         repository: GoogleSearchConsoleRepository,
@@ -48,8 +58,12 @@ class GoogleSearchConsoleService:
         """Return paginated Google Search Console properties."""
 
         items, total = self.repository.list_properties(params)
+        last_syncs = self.repository.get_latest_import_completed_at_by_property_ids(
+            [item.id for item in items],
+            statuses=self.SYNCED_IMPORT_STATUSES,
+        )
         return GoogleSearchConsolePropertyList(
-            items=[GoogleSearchConsolePropertyRead.model_validate(item) for item in items],
+            items=[self._property_read(item, last_syncs.get(item.id)) for item in items],
             total=total,
             page=params.page,
             page_size=params.page_size,
@@ -73,7 +87,12 @@ class GoogleSearchConsoleService:
     def get_property(self, property_id: int) -> GoogleSearchConsolePropertyRead:
         """Return one Google Search Console property."""
 
-        return GoogleSearchConsolePropertyRead.model_validate(self._get_property_model(property_id))
+        item = self._get_property_model(property_id)
+        last_sync_at = self.repository.get_latest_import_completed_at(
+            item.id,
+            statuses=self.SYNCED_IMPORT_STATUSES,
+        )
+        return self._property_read(item, last_sync_at)
 
     def create_property(self, payload: GoogleSearchConsolePropertyCreate) -> GoogleSearchConsolePropertyRead:
         """Create a Google Search Console property."""
@@ -85,7 +104,7 @@ class GoogleSearchConsoleService:
                 detail="Propriete Google Search Console deja existante.",
             )
         item = self.repository.create(payload.model_dump())
-        return GoogleSearchConsolePropertyRead.model_validate(item)
+        return self._property_read(item, None)
 
     def update_property(
         self,
@@ -104,7 +123,12 @@ class GoogleSearchConsoleService:
                     status_code=status.HTTP_409_CONFLICT,
                     detail="Propriete Google Search Console deja existante.",
                 )
-        return GoogleSearchConsolePropertyRead.model_validate(self.repository.update(item, data))
+        updated = self.repository.update(item, data)
+        last_sync_at = self.repository.get_latest_import_completed_at(
+            updated.id,
+            statuses=self.SYNCED_IMPORT_STATUSES,
+        )
+        return self._property_read(updated, last_sync_at)
 
     def update_oauth_tokens(
         self,
@@ -119,7 +143,12 @@ class GoogleSearchConsoleService:
             data["encrypted_access_token"] = encrypt_secret(data.pop("access_token"))
         if "refresh_token" in data and data["refresh_token"] is not None:
             data["encrypted_refresh_token"] = encrypt_secret(data.pop("refresh_token"))
-        return GoogleSearchConsolePropertyRead.model_validate(self.repository.update(item, data))
+        updated = self.repository.update(item, data)
+        last_sync_at = self.repository.get_latest_import_completed_at(
+            updated.id,
+            statuses=self.SYNCED_IMPORT_STATUSES,
+        )
+        return self._property_read(updated, last_sync_at)
 
     def delete_property(self, property_id: int) -> None:
         """Delete a Google Search Console property."""
@@ -131,10 +160,21 @@ class GoogleSearchConsoleService:
         params: PaginationParams,
         *,
         property_id: int | None = None,
+        filters: GoogleSearchConsolePerformanceFilters | None = None,
     ) -> GoogleSearchConsolePerformanceList:
         """Return paginated performance rows."""
 
-        items, total = self.repository.list_performances(params, property_id=property_id)
+        filters = self._normalize_performance_filters(filters or GoogleSearchConsolePerformanceFilters())
+        items, total = self.repository.list_performances(
+            params,
+            property_id=property_id,
+            start_date=filters.start_date,
+            end_date=filters.end_date,
+            page=filters.page,
+            query=filters.query,
+            country=filters.country,
+            device=filters.device,
+        )
         return GoogleSearchConsolePerformanceList(
             items=[GoogleSearchConsolePerformanceRead.model_validate(item) for item in items],
             total=total,
@@ -152,12 +192,16 @@ class GoogleSearchConsoleService:
         """Return paginated index coverage rows."""
 
         items, total = self.repository.list_index_coverages(params, property_id=property_id)
+        aggregates = self._indexation_aggregates(
+            self.repository.list_index_coverage_statuses(property_id=property_id),
+        )
         return GoogleSearchConsoleIndexCoverageList(
             items=[GoogleSearchConsoleIndexCoverageRead.model_validate(item) for item in items],
             total=total,
             page=params.page,
             page_size=params.page_size,
             pages=ceil(total / params.page_size) if total else 0,
+            **aggregates,
         )
 
     def list_sitemaps(
@@ -170,7 +214,7 @@ class GoogleSearchConsoleService:
 
         items, total = self.repository.list_sitemaps(params, property_id=property_id)
         return GoogleSearchConsoleSitemapList(
-            items=[GoogleSearchConsoleSitemapRead.model_validate(item) for item in items],
+            items=[self._sitemap_read(item) for item in items],
             total=total,
             page=params.page,
             page_size=params.page_size,
@@ -187,7 +231,7 @@ class GoogleSearchConsoleService:
 
         items, total = self.repository.list_imports(params, property_id=property_id)
         return GoogleSearchConsoleImportList(
-            items=[GoogleSearchConsoleImportRead.model_validate(item) for item in items],
+            items=[self._import_read(item) for item in items],
             total=total,
             page=params.page,
             page_size=params.page_size,
@@ -244,7 +288,108 @@ class GoogleSearchConsoleService:
                 detail="Import Google Search Console impossible.",
             ) from exc
 
-        return GoogleSearchConsoleImportRead.model_validate(import_log)
+        return self._import_read(import_log)
+
+    def _property_read(
+        self,
+        item: GoogleSearchConsoleProperty,
+        last_sync_at: datetime | None,
+    ) -> GoogleSearchConsolePropertyRead:
+        return GoogleSearchConsolePropertyRead.model_validate(item).model_copy(
+            update={"last_sync_at": last_sync_at},
+        )
+
+    def _sitemap_read(self, item: object) -> GoogleSearchConsoleSitemapRead:
+        read = GoogleSearchConsoleSitemapRead.model_validate(item)
+        return read.model_copy(update={"url_count": self._sitemap_url_count(read.contents)})
+
+    def _import_read(self, item: object) -> GoogleSearchConsoleImportRead:
+        read = GoogleSearchConsoleImportRead.model_validate(item)
+        return read.model_copy(
+            update={"duration_seconds": self._duration_seconds(read.started_at, read.completed_at)},
+        )
+
+    def _normalize_performance_filters(
+        self,
+        filters: GoogleSearchConsolePerformanceFilters,
+    ) -> GoogleSearchConsolePerformanceFilters:
+        if filters.start_date is not None and filters.end_date is not None and filters.end_date < filters.start_date:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="La date de fin doit etre superieure ou egale a la date de debut.",
+            )
+        return GoogleSearchConsolePerformanceFilters(
+            start_date=filters.start_date,
+            end_date=filters.end_date,
+            page=self._clean_filter_value(filters.page),
+            query=self._clean_filter_value(filters.query),
+            country=self._clean_filter_value(filters.country),
+            device=self._clean_filter_value(filters.device),
+        )
+
+    def _indexation_aggregates(
+        self,
+        rows: list[tuple[str, str | None, str | None, str | None]],
+    ) -> dict[str, int]:
+        aggregates = {"valid_pages": 0, "excluded_pages": 0, "errors": 0, "warnings": 0}
+        for coverage_state, verdict, google_state, indexing_state in rows:
+            states = {
+                self._normalize_state(coverage_state),
+                self._normalize_state(verdict),
+                self._normalize_state(google_state),
+                self._normalize_state(indexing_state),
+            }
+            if states & self.ERROR_INDEX_STATES:
+                aggregates["errors"] += 1
+            elif states & self.WARNING_INDEX_STATES:
+                aggregates["warnings"] += 1
+            elif states & self.EXCLUDED_INDEX_STATES:
+                aggregates["excluded_pages"] += 1
+            elif states & self.VALID_INDEX_STATES:
+                aggregates["valid_pages"] += 1
+        return aggregates
+
+    def _sitemap_url_count(self, contents: dict[str, object] | None) -> int:
+        if not contents:
+            return 0
+        explicit_count = self._positive_int(contents.get("url_count"))
+        if explicit_count is not None:
+            return explicit_count
+        root_count = self._positive_int(contents.get("submitted")) or self._positive_int(contents.get("indexed"))
+        if root_count is not None:
+            return root_count
+        urls = contents.get("urls")
+        if isinstance(urls, list):
+            return len(urls)
+        nested_contents = contents.get("contents")
+        if not isinstance(nested_contents, list):
+            return 0
+        total = 0
+        for content in nested_contents:
+            if isinstance(content, dict):
+                total += self._positive_int(content.get("submitted")) or self._positive_int(content.get("indexed")) or 0
+        return total
+
+    def _duration_seconds(self, started_at: datetime | None, completed_at: datetime | None) -> float | None:
+        if started_at is None or completed_at is None:
+            return None
+        return max((completed_at - started_at).total_seconds(), 0.0)
+
+    def _clean_filter_value(self, value: str | None) -> str | None:
+        if value is None:
+            return None
+        cleaned = value.strip()
+        return cleaned or None
+
+    def _normalize_state(self, value: str | None) -> str:
+        return (value or "").strip().upper().replace(" ", "_")
+
+    def _positive_int(self, value: object) -> int | None:
+        if isinstance(value, bool):
+            return None
+        if isinstance(value, int) and value >= 0:
+            return value
+        return None
 
     def _import_property_data(
         self,

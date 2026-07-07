@@ -1,8 +1,9 @@
 """Routes Google Search Console."""
 
+from datetime import date
 from typing import Any
 
-from fastapi import APIRouter, Depends, Query, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
 from backend.app.core.database import get_db
@@ -14,6 +15,7 @@ from backend.app.schemas.google_search_console import (
     GoogleSearchConsoleIndexCoverageList,
     GoogleSearchConsoleManualImportRequest,
     GoogleSearchConsoleOAuthTokenUpdate,
+    GoogleSearchConsolePerformanceFilters,
     GoogleSearchConsolePerformanceList,
     GoogleSearchConsolePropertyCreate,
     GoogleSearchConsolePropertyList,
@@ -21,7 +23,7 @@ from backend.app.schemas.google_search_console import (
     GoogleSearchConsolePropertyUpdate,
     GoogleSearchConsoleSitemapList,
 )
-from backend.app.schemas.pagination import PaginationParams, pagination_params
+from backend.app.schemas.pagination import Order, PaginationParams, pagination_params
 from backend.app.services.google_search_console import GoogleSearchConsoleService
 
 router = APIRouter(prefix="/google-search-console", tags=["Google Search Console"])
@@ -149,12 +151,50 @@ def delete_property(property_id: int, service: GoogleSearchConsoleService = Depe
 )
 def list_performances(
     property_id: int | None = Query(default=None, gt=0),
-    params: PaginationParams = Depends(pagination_params),
+    page: list[str] | None = Query(default=None, description="Numero de page ou filtre URL de page GSC."),
+    page_size: int = Query(20, ge=1, le=100, description="Nombre d'elements par page."),
+    search: str | None = Query(None, description="Recherche plein texte simple."),
+    sort: str | None = Query(None, description="Colonne de tri."),
+    order: Order = Query("asc", description="Ordre de tri."),
+    start_date: date | None = Query(default=None),
+    end_date: date | None = Query(default=None),
+    query: str | None = Query(default=None, max_length=1000),
+    country: str | None = Query(default=None, max_length=10),
+    device: str | None = Query(default=None, max_length=40),
     service: GoogleSearchConsoleService = Depends(get_service),
 ) -> Any:
     """Return paginated performance rows."""
 
-    return service.list_performances(params, property_id=property_id)
+    pagination_page, performance_page = _performance_page_values(page)
+    return service.list_performances(
+        PaginationParams(page=pagination_page, page_size=page_size, search=search, sort=sort, order=order),
+        property_id=property_id,
+        filters=GoogleSearchConsolePerformanceFilters(
+            start_date=start_date,
+            end_date=end_date,
+            page=performance_page,
+            query=query,
+            country=country,
+            device=device,
+        ),
+    )
+
+
+def _performance_page_values(values: list[str] | None) -> tuple[int, str | None]:
+    pagination_page = 1
+    performance_page = None
+    for value in values or []:
+        if value.isdecimal() and performance_page is None:
+            parsed_page = int(value)
+            if parsed_page < 1:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                    detail="Le numero de page doit etre superieur ou egal a 1.",
+                )
+            pagination_page = parsed_page
+        elif performance_page is None:
+            performance_page = value
+    return pagination_page, performance_page
 
 
 @router.get(

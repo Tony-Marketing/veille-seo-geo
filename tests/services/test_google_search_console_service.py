@@ -22,8 +22,10 @@ from backend.app.repositories.google_search_console import GoogleSearchConsoleRe
 from backend.app.schemas.google_search_console import (
     GoogleSearchConsoleManualImportRequest,
     GoogleSearchConsoleOAuthTokenUpdate,
+    GoogleSearchConsolePerformanceFilters,
     GoogleSearchConsolePropertyCreate,
 )
+from backend.app.schemas.pagination import PaginationParams
 from backend.app.services.google_search_console import GoogleSearchConsoleService
 
 
@@ -53,6 +55,8 @@ class FakeGoogleSearchConsoleConnector:
                 date=start_date,
                 query="audit seo",
                 page="https://example.com/",
+                country="FRA",
+                device="DESKTOP",
                 search_type=search_type,
                 clicks=10,
                 impressions=100,
@@ -75,6 +79,7 @@ class FakeGoogleSearchConsoleConnector:
             GoogleSearchConsoleSitemapRow(
                 sitemap_url="https://example.com/sitemap.xml",
                 sitemap_type="WEB",
+                contents={"contents": [{"type": "WEB", "submitted": 42}]},
             ),
         ]
 
@@ -168,6 +173,77 @@ def test_google_search_console_service_runs_idempotent_import(db_session: Sessio
     assert db_session.query(GoogleSearchConsolePerformance).count() == 1
     assert db_session.query(GoogleSearchConsoleIndexCoverage).count() == 1
     assert db_session.query(GoogleSearchConsoleSitemap).count() == 1
+    assert first_import.duration_seconds is not None
+    assert first_import.duration_seconds >= 0
+
+
+def test_google_search_console_service_exposes_desktop_api_complements(db_session: Session) -> None:
+    """The service calculates the REST complements needed by Sprint 24B."""
+
+    service = _service(db_session)
+    created = service.create_property(
+        GoogleSearchConsolePropertyCreate(
+            google_property_id="sc-domain:example.com",
+            property_url="sc-domain:example.com",
+        ),
+    )
+    service.run_manual_import(
+        GoogleSearchConsoleManualImportRequest(
+            property_id=created.id,
+            start_date=date(2026, 7, 1),
+            end_date=date(2026, 7, 7),
+        ),
+    )
+    repository = GoogleSearchConsoleRepository(db_session)
+    repository.upsert_index_coverage(
+        {
+            "property_id": created.id,
+            "url": "https://example.com/excluded",
+            "coverage_state": "EXCLUDED",
+        },
+    )
+    repository.upsert_index_coverage(
+        {
+            "property_id": created.id,
+            "url": "https://example.com/error",
+            "coverage_state": "ERROR",
+            "verdict": "FAIL",
+        },
+    )
+    repository.upsert_index_coverage(
+        {
+            "property_id": created.id,
+            "url": "https://example.com/warning",
+            "coverage_state": "WARNING",
+            "verdict": "PARTIAL",
+        },
+    )
+
+    properties = service.list_properties(PaginationParams())
+    performances = service.list_performances(
+        PaginationParams(),
+        property_id=created.id,
+        filters=GoogleSearchConsolePerformanceFilters(
+            start_date=date(2026, 7, 1),
+            end_date=date(2026, 7, 7),
+            page="https://example.com/",
+            query="audit seo",
+            country="FRA",
+            device="DESKTOP",
+        ),
+    )
+    indexation = service.list_index_coverages(PaginationParams(), property_id=created.id)
+    sitemaps = service.list_sitemaps(PaginationParams(), property_id=created.id)
+    imports = service.list_imports(PaginationParams(), property_id=created.id)
+
+    assert properties.items[0].last_sync_at is not None
+    assert performances.total == 1
+    assert indexation.valid_pages == 1
+    assert indexation.excluded_pages == 1
+    assert indexation.errors == 1
+    assert indexation.warnings == 1
+    assert sitemaps.items[0].url_count == 42
+    assert imports.items[0].duration_seconds is not None
 
 
 def test_google_search_console_service_rejects_invalid_import_dates(db_session: Session) -> None:

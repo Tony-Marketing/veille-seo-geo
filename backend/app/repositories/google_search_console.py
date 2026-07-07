@@ -1,5 +1,6 @@
 """Repository for Google Search Console data."""
 
+from datetime import date, datetime
 from typing import Any
 
 from sqlalchemy import func, select
@@ -59,14 +60,29 @@ class GoogleSearchConsoleRepository(BaseRepository[GoogleSearchConsoleProperty])
         params: PaginationParams,
         *,
         property_id: int | None = None,
+        start_date: date | None = None,
+        end_date: date | None = None,
+        page: str | None = None,
+        query: str | None = None,
+        country: str | None = None,
+        device: str | None = None,
     ) -> tuple[list[GoogleSearchConsolePerformance], int]:
         """Return paginated performance rows."""
 
         statement = select(GoogleSearchConsolePerformance)
         count_statement = select(func.count()).select_from(GoogleSearchConsolePerformance)
-        if property_id is not None:
-            statement = statement.where(GoogleSearchConsolePerformance.property_id == property_id)
-            count_statement = count_statement.where(GoogleSearchConsolePerformance.property_id == property_id)
+        filters = self._performance_filters(
+            property_id=property_id,
+            start_date=start_date,
+            end_date=end_date,
+            page=page,
+            query=query,
+            country=country,
+            device=device,
+        )
+        if filters:
+            statement = statement.where(*filters)
+            count_statement = count_statement.where(*filters)
         statement = self._order_and_page(statement, params, GoogleSearchConsolePerformance)
         return list(self.db.scalars(statement)), int(self.db.scalar(count_statement) or 0)
 
@@ -117,6 +133,64 @@ class GoogleSearchConsoleRepository(BaseRepository[GoogleSearchConsoleProperty])
             count_statement = count_statement.where(GoogleSearchConsoleImport.property_id == property_id)
         statement = self._order_and_page(statement, params, GoogleSearchConsoleImport)
         return list(self.db.scalars(statement)), int(self.db.scalar(count_statement) or 0)
+
+    def get_latest_import_completed_at(
+        self,
+        property_id: int,
+        *,
+        statuses: tuple[str, ...] = (),
+    ) -> datetime | None:
+        """Return the latest completed import date for one property."""
+
+        statement = select(func.max(GoogleSearchConsoleImport.completed_at)).where(
+            GoogleSearchConsoleImport.property_id == property_id,
+            GoogleSearchConsoleImport.completed_at.is_not(None),
+        )
+        if statuses:
+            statement = statement.where(GoogleSearchConsoleImport.status.in_(statuses))
+        return self.db.scalar(statement)
+
+    def get_latest_import_completed_at_by_property_ids(
+        self,
+        property_ids: list[int],
+        *,
+        statuses: tuple[str, ...] = (),
+    ) -> dict[int, datetime]:
+        """Return latest completed import dates keyed by property id."""
+
+        if not property_ids:
+            return {}
+        statement = (
+            select(
+                GoogleSearchConsoleImport.property_id,
+                func.max(GoogleSearchConsoleImport.completed_at),
+            )
+            .where(
+                GoogleSearchConsoleImport.property_id.in_(property_ids),
+                GoogleSearchConsoleImport.completed_at.is_not(None),
+            )
+            .group_by(GoogleSearchConsoleImport.property_id)
+        )
+        if statuses:
+            statement = statement.where(GoogleSearchConsoleImport.status.in_(statuses))
+        return {property_id: completed_at for property_id, completed_at in self.db.execute(statement).all()}
+
+    def list_index_coverage_statuses(
+        self,
+        *,
+        property_id: int | None = None,
+    ) -> list[tuple[str, str | None, str | None, str | None]]:
+        """Return indexation status fields used by the service aggregates."""
+
+        statement = select(
+            GoogleSearchConsoleIndexCoverage.coverage_state,
+            GoogleSearchConsoleIndexCoverage.verdict,
+            GoogleSearchConsoleIndexCoverage.google_state,
+            GoogleSearchConsoleIndexCoverage.indexing_state,
+        )
+        if property_id is not None:
+            statement = statement.where(GoogleSearchConsoleIndexCoverage.property_id == property_id)
+        return list(self.db.execute(statement).all())
 
     def create_import(self, data: dict[str, Any]) -> GoogleSearchConsoleImport:
         """Persist a new import log."""
@@ -200,3 +274,31 @@ class GoogleSearchConsoleRepository(BaseRepository[GoogleSearchConsoleProperty])
         else:
             statement = statement.order_by(model.id.desc())
         return statement.offset(params.offset).limit(params.page_size)
+
+    def _performance_filters(
+        self,
+        *,
+        property_id: int | None = None,
+        start_date: date | None = None,
+        end_date: date | None = None,
+        page: str | None = None,
+        query: str | None = None,
+        country: str | None = None,
+        device: str | None = None,
+    ) -> list[Any]:
+        filters = []
+        if property_id is not None:
+            filters.append(GoogleSearchConsolePerformance.property_id == property_id)
+        if start_date is not None:
+            filters.append(GoogleSearchConsolePerformance.date >= start_date)
+        if end_date is not None:
+            filters.append(GoogleSearchConsolePerformance.date <= end_date)
+        if page is not None:
+            filters.append(GoogleSearchConsolePerformance.page == page)
+        if query is not None:
+            filters.append(GoogleSearchConsolePerformance.query == query)
+        if country is not None:
+            filters.append(GoogleSearchConsolePerformance.country == country)
+        if device is not None:
+            filters.append(GoogleSearchConsolePerformance.device == device)
+        return filters
