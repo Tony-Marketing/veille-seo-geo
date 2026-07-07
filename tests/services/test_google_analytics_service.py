@@ -11,7 +11,10 @@ from backend.app.core.security import decrypt_secret
 from backend.app.models import GoogleAnalyticsDimension, GoogleAnalyticsMetric
 from backend.app.repositories.google_analytics import GoogleAnalyticsRepository
 from backend.app.schemas.google_analytics import (
+    GoogleAnalyticsImportFilters,
     GoogleAnalyticsImportRequest,
+    GoogleAnalyticsImportStatus,
+    GoogleAnalyticsMetricFilters,
     GoogleAnalyticsOAuthConnectRequest,
     GoogleAnalyticsOAuthRefreshRequest,
     GoogleAnalyticsPropertyCreate,
@@ -187,3 +190,111 @@ def test_google_analytics_service_rejects_invalid_import_requests(db_session: Se
                 end_date=date(2026, 7, 7),
             ),
         )
+
+
+def test_google_analytics_service_lists_metrics_with_filters_and_pagination(db_session: Session) -> None:
+    """The service exposes filtered and paginated metrics for the API."""
+
+    service = _service(db_session)
+    created = service.create_property(
+        GoogleAnalyticsPropertyCreate(property_id="properties/123", property_name="Example GA4"),
+    )
+    service.run_manual_import(
+        GoogleAnalyticsImportRequest(
+            property_id=created.id,
+            start_date=date(2026, 7, 1),
+            end_date=date(2026, 7, 7),
+        ),
+    )
+
+    metrics = service.list_metrics(
+        PaginationParams(page=1, page_size=10, sort="sessions", order="desc"),
+        filters=GoogleAnalyticsMetricFilters(property_id=created.id, source="google", search="organic"),
+    )
+
+    assert metrics.total == 1
+    assert metrics.pages == 1
+    assert metrics.filters["property_id"] == created.id
+    assert metrics.items[0].sessions == 12
+
+
+def test_google_analytics_service_rejects_invalid_metric_filters_and_sort(db_session: Session) -> None:
+    """The service validates metric periods and converts repository sort errors."""
+
+    service = _service(db_session)
+
+    with pytest.raises(HTTPException) as invalid_period:
+        service.list_metrics(
+            PaginationParams(),
+            filters=GoogleAnalyticsMetricFilters(date_from=date(2026, 7, 7), date_to=date(2026, 7, 1)),
+        )
+    with pytest.raises(HTTPException) as invalid_sort:
+        service.list_metrics(PaginationParams(sort="not_allowed"))
+
+    assert invalid_period.value.status_code == 422
+    assert invalid_sort.value.status_code == 422
+
+
+def test_google_analytics_service_computes_overview_and_breakdowns(db_session: Session) -> None:
+    """The service computes KPIs and specialized endpoint data backend-side."""
+
+    service = _service(db_session)
+    created = service.create_property(
+        GoogleAnalyticsPropertyCreate(property_id="properties/123", property_name="Example GA4"),
+    )
+    service.run_manual_import(
+        GoogleAnalyticsImportRequest(
+            property_id=created.id,
+            start_date=date(2026, 7, 1),
+            end_date=date(2026, 7, 7),
+        ),
+    )
+
+    overview = service.overview(GoogleAnalyticsMetricFilters(property_id=created.id))
+    traffic = service.traffic(GoogleAnalyticsMetricFilters(property_id=created.id))
+    acquisition = service.acquisition(GoogleAnalyticsMetricFilters(property_id=created.id))
+    engagement = service.engagement(GoogleAnalyticsMetricFilters(property_id=created.id))
+    conversions = service.conversions(GoogleAnalyticsMetricFilters(property_id=created.id))
+    revenue = service.revenue(GoogleAnalyticsMetricFilters(property_id=created.id))
+
+    assert overview.data.sessions == 12
+    assert overview.data.users == 10
+    assert overview.data.new_users == 4
+    assert overview.data.engagement_rate == 0.75
+    assert overview.data.average_session_duration == 42.5
+    assert overview.data.conversions == 2.0
+    assert overview.data.total_revenue == 120.0
+    assert traffic.dimension == "source"
+    assert traffic.data[0].dimension == "google"
+    assert acquisition.dimension == "medium"
+    assert acquisition.data[0].dimension == "organic"
+    assert engagement.dimension == "device_category"
+    assert conversions.data[0].conversions == 2.0
+    assert revenue.data[0].total_revenue == 120.0
+
+
+def test_google_analytics_service_returns_enriched_history(db_session: Session) -> None:
+    """The service enriches import history with property information."""
+
+    service = _service(db_session)
+    created = service.create_property(
+        GoogleAnalyticsPropertyCreate(property_id="properties/123", property_name="Example GA4"),
+    )
+    service.run_manual_import(
+        GoogleAnalyticsImportRequest(
+            property_id=created.id,
+            start_date=date(2026, 7, 1),
+            end_date=date(2026, 7, 7),
+        ),
+    )
+
+    history = service.history(
+        PaginationParams(),
+        filters=GoogleAnalyticsImportFilters(property_id=created.id, status=GoogleAnalyticsImportStatus.COMPLETED),
+    )
+
+    assert history.total == 1
+    assert history.filters["status"] == "COMPLETED"
+    assert history.items[0].property_name == "Example GA4"
+    assert history.items[0].google_property_id == "properties/123"
+    assert history.items[0].duration_seconds is not None
