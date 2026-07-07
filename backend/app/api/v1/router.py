@@ -10,6 +10,7 @@ from backend.app.api.v1.routes import (
     dashboard,
     entities,
     geo_analysis,
+    google_search_console,
     keywords,
     permissions,
     project_tasks,
@@ -37,6 +38,7 @@ api_router.include_router(reports.router)
 api_router.include_router(project_tasks.router)
 api_router.include_router(seo_analysis.router)
 api_router.include_router(geo_analysis.router)
+api_router.include_router(google_search_console.router)
 api_router.include_router(admin.router)
 
 router = api_router
