@@ -1,7 +1,9 @@
 """Business service for Google Analytics 4."""
 
+from collections.abc import Callable
 from datetime import UTC, datetime
 from math import ceil
+from typing import TypeVar
 
 from fastapi import HTTPException, status
 
@@ -14,10 +16,19 @@ from backend.app.core.security import decrypt_secret, encrypt_secret
 from backend.app.models import GoogleAnalyticsProperty
 from backend.app.repositories.google_analytics import GoogleAnalyticsRepository
 from backend.app.schemas.google_analytics import (
+    GoogleAnalyticsBreakdownItem,
+    GoogleAnalyticsBreakdownResponse,
+    GoogleAnalyticsImportFilters,
+    GoogleAnalyticsImportHistoryList,
+    GoogleAnalyticsImportHistoryRead,
     GoogleAnalyticsImportList,
     GoogleAnalyticsImportRead,
     GoogleAnalyticsImportRequest,
     GoogleAnalyticsImportStatus,
+    GoogleAnalyticsKpiRead,
+    GoogleAnalyticsMetricFilters,
+    GoogleAnalyticsMetricList,
+    GoogleAnalyticsMetricRead,
     GoogleAnalyticsOAuthConnectRequest,
     GoogleAnalyticsOAuthRefreshRequest,
     GoogleAnalyticsOAuthResponse,
@@ -25,8 +36,11 @@ from backend.app.schemas.google_analytics import (
     GoogleAnalyticsPropertyList,
     GoogleAnalyticsPropertyRead,
     GoogleAnalyticsPropertyUpdate,
+    GoogleAnalyticsSummaryResponse,
 )
 from backend.app.schemas.pagination import PaginationParams
+
+RepositoryResult = TypeVar("RepositoryResult")
 
 
 class GoogleAnalyticsService:
@@ -122,16 +136,107 @@ class GoogleAnalyticsService:
         params: PaginationParams,
         *,
         property_id: int | None = None,
+        filters: GoogleAnalyticsImportFilters | None = None,
     ) -> GoogleAnalyticsImportList:
         """Return paginated import logs."""
 
-        items, total = self.repository.list_imports(params, property_id=property_id)
+        filters = self._normalize_import_filters(filters or GoogleAnalyticsImportFilters(property_id=property_id))
+        items, total = self._repository_result(
+            self.repository.list_imports,
+            params,
+            property_id=filters.property_id,
+            status=filters.status.value if filters.status is not None else None,
+            search=filters.search,
+        )
         return GoogleAnalyticsImportList(
             items=[self._import_read(item) for item in items],
             total=total,
             page=params.page,
             page_size=params.page_size,
             pages=ceil(total / params.page_size) if total else 0,
+        )
+
+    def list_metrics(
+        self,
+        params: PaginationParams,
+        *,
+        filters: GoogleAnalyticsMetricFilters | None = None,
+    ) -> GoogleAnalyticsMetricList:
+        """Return paginated Google Analytics metric rows."""
+
+        filters = self._normalize_metric_filters(filters or GoogleAnalyticsMetricFilters())
+        items, total = self._repository_result(
+            self.repository.list_metrics,
+            params,
+            **self._metric_filter_values(filters),
+        )
+        return GoogleAnalyticsMetricList(
+            items=[GoogleAnalyticsMetricRead.model_validate(item) for item in items],
+            total=total,
+            page=params.page,
+            page_size=params.page_size,
+            pages=ceil(total / params.page_size) if total else 0,
+            filters=self._filters_dict(filters),
+        )
+
+    def overview(self, filters: GoogleAnalyticsMetricFilters | None = None) -> GoogleAnalyticsSummaryResponse:
+        """Return backend-computed KPIs for Desktop overview."""
+
+        filters = self._normalize_metric_filters(filters or GoogleAnalyticsMetricFilters())
+        return GoogleAnalyticsSummaryResponse(
+            generated_at=datetime.now(UTC),
+            filters=self._filters_dict(filters),
+            data=self._aggregate_kpis(filters),
+        )
+
+    def traffic(self, filters: GoogleAnalyticsMetricFilters | None = None) -> GoogleAnalyticsBreakdownResponse:
+        """Return traffic aggregates grouped by source."""
+
+        return self._breakdown_response("source", filters)
+
+    def acquisition(self, filters: GoogleAnalyticsMetricFilters | None = None) -> GoogleAnalyticsBreakdownResponse:
+        """Return acquisition aggregates grouped by medium."""
+
+        return self._breakdown_response("medium", filters)
+
+    def engagement(self, filters: GoogleAnalyticsMetricFilters | None = None) -> GoogleAnalyticsBreakdownResponse:
+        """Return engagement aggregates grouped by device category."""
+
+        return self._breakdown_response("device_category", filters)
+
+    def conversions(self, filters: GoogleAnalyticsMetricFilters | None = None) -> GoogleAnalyticsBreakdownResponse:
+        """Return conversion aggregates grouped by source."""
+
+        return self._breakdown_response("source", filters)
+
+    def revenue(self, filters: GoogleAnalyticsMetricFilters | None = None) -> GoogleAnalyticsBreakdownResponse:
+        """Return revenue aggregates grouped by campaign."""
+
+        return self._breakdown_response("campaign", filters)
+
+    def history(
+        self,
+        params: PaginationParams,
+        *,
+        filters: GoogleAnalyticsImportFilters | None = None,
+    ) -> GoogleAnalyticsImportHistoryList:
+        """Return paginated and enriched import history."""
+
+        filters = self._normalize_import_filters(filters or GoogleAnalyticsImportFilters())
+        items, total = self._repository_result(
+            self.repository.list_imports,
+            params,
+            property_id=filters.property_id,
+            status=filters.status.value if filters.status is not None else None,
+            search=filters.search,
+        )
+        return GoogleAnalyticsImportHistoryList(
+            items=[self._import_history_read(item) for item in items],
+            total=total,
+            page=params.page,
+            page_size=params.page_size,
+            pages=ceil(total / params.page_size) if total else 0,
+            filters=self._filters_dict(filters),
         )
 
     def get_import(self, import_id: int) -> GoogleAnalyticsImportRead:
@@ -307,7 +412,120 @@ class GoogleAnalyticsService:
         read = GoogleAnalyticsImportRead.model_validate(item)
         return read.model_copy(update={"duration_seconds": self._duration_seconds(read.started_at, read.finished_at)})
 
+    def _import_history_read(self, item: object) -> GoogleAnalyticsImportHistoryRead:
+        read = GoogleAnalyticsImportHistoryRead.model_validate(item)
+        property_item = getattr(item, "property", None)
+        return read.model_copy(
+            update={
+                "duration_seconds": self._duration_seconds(read.started_at, read.finished_at),
+                "property_name": getattr(property_item, "property_name", None),
+                "google_property_id": getattr(property_item, "property_id", None),
+            },
+        )
+
     def _duration_seconds(self, started_at: datetime | None, finished_at: datetime | None) -> float | None:
         if started_at is None or finished_at is None:
             return None
         return max((finished_at - started_at).total_seconds(), 0.0)
+
+    def _normalize_metric_filters(self, filters: GoogleAnalyticsMetricFilters) -> GoogleAnalyticsMetricFilters:
+        if filters.date_from is not None and filters.date_to is not None and filters.date_to < filters.date_from:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="La date de fin doit etre superieure ou egale a la date de debut.",
+            )
+        return GoogleAnalyticsMetricFilters(
+            website_id=filters.website_id,
+            property_id=filters.property_id,
+            date_from=filters.date_from,
+            date_to=filters.date_to,
+            import_id=filters.import_id,
+            source=self._clean_dimension(filters.source),
+            medium=self._clean_dimension(filters.medium),
+            campaign=self._clean_dimension(filters.campaign),
+            device_category=self._clean_dimension(filters.device_category),
+            country=self._clean_dimension(filters.country),
+            search=self._clean_dimension(filters.search),
+        )
+
+    def _normalize_import_filters(self, filters: GoogleAnalyticsImportFilters) -> GoogleAnalyticsImportFilters:
+        return GoogleAnalyticsImportFilters(
+            property_id=filters.property_id,
+            status=filters.status,
+            search=self._clean_dimension(filters.search),
+        )
+
+    def _metric_filter_values(self, filters: GoogleAnalyticsMetricFilters) -> dict[str, object]:
+        return filters.model_dump(exclude_none=True)
+
+    def _filters_dict(self, filters: GoogleAnalyticsMetricFilters | GoogleAnalyticsImportFilters) -> dict[str, object]:
+        return filters.model_dump(mode="json", exclude_none=True)
+
+    def _repository_result(
+        self,
+        repository_method: Callable[..., RepositoryResult],
+        *args: object,
+        **kwargs: object,
+    ) -> RepositoryResult:
+        try:
+            return repository_method(*args, **kwargs)
+        except ValueError as exc:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
+
+    def _aggregate_kpis(self, filters: GoogleAnalyticsMetricFilters) -> GoogleAnalyticsKpiRead:
+        raw = self.repository.aggregate_metrics(**self._metric_filter_values(filters))
+        return self._kpis_from_raw(raw)
+
+    def _kpis_from_raw(self, raw: dict[str, float | int]) -> GoogleAnalyticsKpiRead:
+        sessions = int(raw["sessions"])
+        return GoogleAnalyticsKpiRead(
+            rows=int(raw["rows"]),
+            sessions=sessions,
+            users=int(raw["users"]),
+            new_users=int(raw["new_users"]),
+            engaged_sessions=int(raw["engaged_sessions"]),
+            screen_page_views=int(raw["screen_page_views"]),
+            average_session_duration=self._safe_ratio(float(raw["duration_weight"]), sessions),
+            engagement_rate=self._safe_ratio(float(raw["engagement_weight"]), sessions),
+            conversions=float(raw["conversions"]),
+            total_revenue=float(raw["total_revenue"]),
+        )
+
+    def _breakdown_response(
+        self,
+        dimension: str,
+        filters: GoogleAnalyticsMetricFilters | None,
+    ) -> GoogleAnalyticsBreakdownResponse:
+        filters = self._normalize_metric_filters(filters or GoogleAnalyticsMetricFilters())
+        rows = self._repository_result(
+            self.repository.aggregate_metrics_by_dimension,
+            dimension,
+            **self._metric_filter_values(filters),
+        )
+        return GoogleAnalyticsBreakdownResponse(
+            generated_at=datetime.now(UTC),
+            filters=self._filters_dict(filters),
+            dimension=dimension,
+            data=[self._breakdown_item(row) for row in rows],
+        )
+
+    def _breakdown_item(self, raw: dict[str, float | int | str | None]) -> GoogleAnalyticsBreakdownItem:
+        sessions = int(raw["sessions"] or 0)
+        return GoogleAnalyticsBreakdownItem(
+            dimension=raw["dimension"] if isinstance(raw["dimension"], str) else None,
+            rows=int(raw["rows"] or 0),
+            sessions=sessions,
+            users=int(raw["users"] or 0),
+            new_users=int(raw["new_users"] or 0),
+            engaged_sessions=int(raw["engaged_sessions"] or 0),
+            screen_page_views=int(raw["screen_page_views"] or 0),
+            average_session_duration=self._safe_ratio(float(raw["duration_weight"] or 0.0), sessions),
+            engagement_rate=self._safe_ratio(float(raw["engagement_weight"] or 0.0), sessions),
+            conversions=float(raw["conversions"] or 0.0),
+            total_revenue=float(raw["total_revenue"] or 0.0),
+        )
+
+    def _safe_ratio(self, numerator: float, denominator: int) -> float:
+        if denominator <= 0:
+            return 0.0
+        return numerator / denominator

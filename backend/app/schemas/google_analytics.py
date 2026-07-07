@@ -2,6 +2,7 @@
 
 from datetime import date, datetime
 from enum import StrEnum
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -77,6 +78,30 @@ class GoogleAnalyticsMetricRead(TimestampRead):
     total_revenue: float
 
 
+class GoogleAnalyticsMetricFilters(BaseModel):
+    """REST filters supported by Google Analytics metric endpoints."""
+
+    website_id: int | None = Field(default=None, gt=0)
+    property_id: int | None = Field(default=None, gt=0)
+    date_from: date | None = None
+    date_to: date | None = None
+    import_id: int | None = Field(default=None, gt=0)
+    source: str | None = Field(default=None, max_length=255)
+    medium: str | None = Field(default=None, max_length=255)
+    campaign: str | None = Field(default=None, max_length=255)
+    device_category: str | None = Field(default=None, max_length=80)
+    country: str | None = Field(default=None, max_length=120)
+    search: str | None = Field(default=None, max_length=255)
+
+
+class GoogleAnalyticsImportFilters(BaseModel):
+    """REST filters supported by Google Analytics import history endpoints."""
+
+    property_id: int | None = Field(default=None, gt=0)
+    status: GoogleAnalyticsImportStatus | None = None
+    search: str | None = Field(default=None, max_length=255)
+
+
 class GoogleAnalyticsImportRequest(BaseModel):
     """Payload used to launch a manual Google Analytics import."""
 
@@ -114,6 +139,13 @@ class GoogleAnalyticsImportRead(TimestampRead):
     duration_seconds: float | None = None
 
 
+class GoogleAnalyticsImportHistoryRead(GoogleAnalyticsImportRead):
+    """Import execution log enriched for Desktop history views."""
+
+    property_name: str | None = None
+    google_property_id: str | None = None
+
+
 class GoogleAnalyticsOAuthConnectRequest(BaseModel):
     """Payload used to prepare a Google Analytics OAuth connection."""
 
@@ -137,6 +169,66 @@ class GoogleAnalyticsOAuthResponse(BaseModel):
     token_scopes: list[str] = Field(default_factory=list)
     token_expires_at: datetime | None = None
     status: str = "OK"
+
+
+class GoogleAnalyticsKpiRead(BaseModel):
+    """Backend-computed Google Analytics KPI summary."""
+
+    rows: int = 0
+    sessions: int = 0
+    users: int = 0
+    new_users: int = 0
+    engaged_sessions: int = 0
+    screen_page_views: int = 0
+    average_session_duration: float = 0.0
+    engagement_rate: float = 0.0
+    conversions: float = 0.0
+    total_revenue: float = 0.0
+
+
+class GoogleAnalyticsBreakdownItem(BaseModel):
+    """Aggregated metrics for one dimension value."""
+
+    dimension: str | None = None
+    rows: int = 0
+    sessions: int = 0
+    users: int = 0
+    new_users: int = 0
+    engaged_sessions: int = 0
+    screen_page_views: int = 0
+    average_session_duration: float = 0.0
+    engagement_rate: float = 0.0
+    conversions: float = 0.0
+    total_revenue: float = 0.0
+
+
+class GoogleAnalyticsSummaryResponse(BaseModel):
+    """Google Analytics summary response for Desktop dashboards."""
+
+    generated_at: datetime
+    filters: dict[str, Any]
+    data: GoogleAnalyticsKpiRead
+
+
+class GoogleAnalyticsBreakdownResponse(BaseModel):
+    """Google Analytics specialized breakdown response."""
+
+    generated_at: datetime
+    filters: dict[str, Any]
+    dimension: str
+    data: list[GoogleAnalyticsBreakdownItem]
+
+
+class GoogleAnalyticsMetricList(PaginatedResponse[GoogleAnalyticsMetricRead]):
+    """Paginated Google Analytics metrics with applied filters."""
+
+    filters: dict[str, Any] = Field(default_factory=dict)
+
+
+class GoogleAnalyticsImportHistoryList(PaginatedResponse[GoogleAnalyticsImportHistoryRead]):
+    """Paginated Google Analytics history with applied filters."""
+
+    filters: dict[str, Any] = Field(default_factory=dict)
 
 
 GoogleAnalyticsPropertyList = PaginatedResponse[GoogleAnalyticsPropertyRead]

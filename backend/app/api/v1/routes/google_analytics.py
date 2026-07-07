@@ -1,5 +1,6 @@
 """Routes Google Analytics 4."""
 
+from datetime import date
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query, Response, status
@@ -9,9 +10,15 @@ from backend.app.core.database import get_db
 from backend.app.core.security import require_permission
 from backend.app.repositories.google_analytics import GoogleAnalyticsRepository
 from backend.app.schemas.google_analytics import (
+    GoogleAnalyticsBreakdownResponse,
+    GoogleAnalyticsImportFilters,
+    GoogleAnalyticsImportHistoryList,
     GoogleAnalyticsImportList,
     GoogleAnalyticsImportRead,
     GoogleAnalyticsImportRequest,
+    GoogleAnalyticsImportStatus,
+    GoogleAnalyticsMetricFilters,
+    GoogleAnalyticsMetricList,
     GoogleAnalyticsOAuthConnectRequest,
     GoogleAnalyticsOAuthRefreshRequest,
     GoogleAnalyticsOAuthResponse,
@@ -19,6 +26,7 @@ from backend.app.schemas.google_analytics import (
     GoogleAnalyticsPropertyList,
     GoogleAnalyticsPropertyRead,
     GoogleAnalyticsPropertyUpdate,
+    GoogleAnalyticsSummaryResponse,
 )
 from backend.app.schemas.pagination import PaginationParams, pagination_params
 from backend.app.services.google_analytics import GoogleAnalyticsService
@@ -113,6 +121,173 @@ def run_manual_import(
 
 
 @router.get(
+    "/metrics",
+    response_model=GoogleAnalyticsMetricList,
+    dependencies=[Depends(require_permission("crawl.read"))],
+    summary="Lister metriques Google Analytics",
+    description="Retourne les metriques Google Analytics paginees avec filtres REST.",
+)
+def list_metrics(
+    website_id: int | None = Query(default=None, gt=0),
+    property_id: int | None = Query(default=None, gt=0),
+    date_from: date | None = Query(default=None),
+    date_to: date | None = Query(default=None),
+    import_id: int | None = Query(default=None, gt=0),
+    source: str | None = Query(default=None, max_length=255),
+    medium: str | None = Query(default=None, max_length=255),
+    campaign: str | None = Query(default=None, max_length=255),
+    device_category: str | None = Query(default=None, max_length=80),
+    country: str | None = Query(default=None, max_length=120),
+    params: PaginationParams = Depends(pagination_params),
+    service: GoogleAnalyticsService = Depends(get_service),
+) -> Any:
+    """Return paginated Google Analytics metric rows."""
+
+    return service.list_metrics(
+        params,
+        filters=GoogleAnalyticsMetricFilters(
+            website_id=website_id,
+            property_id=property_id,
+            date_from=date_from,
+            date_to=date_to,
+            import_id=import_id,
+            source=source,
+            medium=medium,
+            campaign=campaign,
+            device_category=device_category,
+            country=country,
+            search=params.search,
+        ),
+    )
+
+
+def _metric_filters(
+    website_id: int | None = Query(default=None, gt=0),
+    property_id: int | None = Query(default=None, gt=0),
+    date_from: date | None = Query(default=None),
+    date_to: date | None = Query(default=None),
+    import_id: int | None = Query(default=None, gt=0),
+    source: str | None = Query(default=None, max_length=255),
+    medium: str | None = Query(default=None, max_length=255),
+    campaign: str | None = Query(default=None, max_length=255),
+    device_category: str | None = Query(default=None, max_length=80),
+    country: str | None = Query(default=None, max_length=120),
+    search: str | None = Query(default=None, max_length=255),
+) -> GoogleAnalyticsMetricFilters:
+    """Build Google Analytics metric filters from query parameters."""
+
+    return GoogleAnalyticsMetricFilters(
+        website_id=website_id,
+        property_id=property_id,
+        date_from=date_from,
+        date_to=date_to,
+        import_id=import_id,
+        source=source,
+        medium=medium,
+        campaign=campaign,
+        device_category=device_category,
+        country=country,
+        search=search,
+    )
+
+
+@router.get(
+    "/overview",
+    response_model=GoogleAnalyticsSummaryResponse,
+    dependencies=[Depends(require_permission("crawl.read"))],
+    summary="Synthese Google Analytics",
+    description="Retourne les KPIs Google Analytics calcules cote backend.",
+)
+def overview(
+    filters: GoogleAnalyticsMetricFilters = Depends(_metric_filters),
+    service: GoogleAnalyticsService = Depends(get_service),
+) -> Any:
+    """Return Google Analytics overview KPIs."""
+
+    return service.overview(filters)
+
+
+@router.get(
+    "/traffic",
+    response_model=GoogleAnalyticsBreakdownResponse,
+    dependencies=[Depends(require_permission("crawl.read"))],
+    summary="Trafic Google Analytics",
+    description="Retourne les agregats de trafic Google Analytics.",
+)
+def traffic(
+    filters: GoogleAnalyticsMetricFilters = Depends(_metric_filters),
+    service: GoogleAnalyticsService = Depends(get_service),
+) -> Any:
+    """Return Google Analytics traffic breakdown."""
+
+    return service.traffic(filters)
+
+
+@router.get(
+    "/acquisition",
+    response_model=GoogleAnalyticsBreakdownResponse,
+    dependencies=[Depends(require_permission("crawl.read"))],
+    summary="Acquisition Google Analytics",
+    description="Retourne les agregats d'acquisition Google Analytics.",
+)
+def acquisition(
+    filters: GoogleAnalyticsMetricFilters = Depends(_metric_filters),
+    service: GoogleAnalyticsService = Depends(get_service),
+) -> Any:
+    """Return Google Analytics acquisition breakdown."""
+
+    return service.acquisition(filters)
+
+
+@router.get(
+    "/engagement",
+    response_model=GoogleAnalyticsBreakdownResponse,
+    dependencies=[Depends(require_permission("crawl.read"))],
+    summary="Engagement Google Analytics",
+    description="Retourne les agregats d'engagement Google Analytics.",
+)
+def engagement(
+    filters: GoogleAnalyticsMetricFilters = Depends(_metric_filters),
+    service: GoogleAnalyticsService = Depends(get_service),
+) -> Any:
+    """Return Google Analytics engagement breakdown."""
+
+    return service.engagement(filters)
+
+
+@router.get(
+    "/conversions",
+    response_model=GoogleAnalyticsBreakdownResponse,
+    dependencies=[Depends(require_permission("crawl.read"))],
+    summary="Conversions Google Analytics",
+    description="Retourne les agregats de conversions Google Analytics.",
+)
+def conversions(
+    filters: GoogleAnalyticsMetricFilters = Depends(_metric_filters),
+    service: GoogleAnalyticsService = Depends(get_service),
+) -> Any:
+    """Return Google Analytics conversion breakdown."""
+
+    return service.conversions(filters)
+
+
+@router.get(
+    "/revenue",
+    response_model=GoogleAnalyticsBreakdownResponse,
+    dependencies=[Depends(require_permission("crawl.read"))],
+    summary="Revenus Google Analytics",
+    description="Retourne les agregats de revenus Google Analytics.",
+)
+def revenue(
+    filters: GoogleAnalyticsMetricFilters = Depends(_metric_filters),
+    service: GoogleAnalyticsService = Depends(get_service),
+) -> Any:
+    """Return Google Analytics revenue breakdown."""
+
+    return service.revenue(filters)
+
+
+@router.get(
     "/imports",
     response_model=GoogleAnalyticsImportList,
     dependencies=[Depends(require_permission("crawl.read"))],
@@ -121,12 +296,37 @@ def run_manual_import(
 )
 def list_imports(
     property_id: int | None = Query(default=None, gt=0),
+    import_status: GoogleAnalyticsImportStatus | None = Query(default=None, alias="status"),
     params: PaginationParams = Depends(pagination_params),
     service: GoogleAnalyticsService = Depends(get_service),
 ) -> Any:
     """Return paginated import logs."""
 
-    return service.list_imports(params, property_id=property_id)
+    return service.list_imports(
+        params,
+        filters=GoogleAnalyticsImportFilters(property_id=property_id, status=import_status, search=params.search),
+    )
+
+
+@router.get(
+    "/history",
+    response_model=GoogleAnalyticsImportHistoryList,
+    dependencies=[Depends(require_permission("crawl.read"))],
+    summary="Historique enrichi Google Analytics",
+    description="Retourne l'historique enrichi des imports Google Analytics.",
+)
+def history(
+    property_id: int | None = Query(default=None, gt=0),
+    import_status: GoogleAnalyticsImportStatus | None = Query(default=None, alias="status"),
+    params: PaginationParams = Depends(pagination_params),
+    service: GoogleAnalyticsService = Depends(get_service),
+) -> Any:
+    """Return enriched import history."""
+
+    return service.history(
+        params,
+        filters=GoogleAnalyticsImportFilters(property_id=property_id, status=import_status, search=params.search),
+    )
 
 
 @router.get(
