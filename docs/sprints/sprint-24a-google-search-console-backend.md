@@ -204,6 +204,16 @@ prévisibles.
 Toutes les routes devront être protégées par les mécanismes d'authentification et de permission existants dans le
 backend. Le Sprint 24A ne doit pas créer un système de sécurité parallèle.
 
+Compléments REST ajoutés pour le Sprint 24B :
+
+- `/performances` accepte les filtres `start_date`, `end_date`, `page`, `query`, `country` et `device`.
+- Les propriétés exposent `last_sync_at`, calculé depuis le dernier import terminé avec succès ou partiellement.
+- `/indexation` expose les agrégats `valid_pages`, `excluded_pages`, `errors` et `warnings`.
+- Les sitemaps exposent `url_count`, calculé depuis les contenus importés lorsqu'ils sont disponibles.
+- Les imports exposent `duration_seconds`, calculé depuis `started_at` et `completed_at`.
+
+Ces compléments sont calculés côté service et n'ajoutent aucune colonne SQLAlchemy ni migration Alembic.
+
 ## 11. Import des données
 
 Le flux d'import attendu est le suivant :

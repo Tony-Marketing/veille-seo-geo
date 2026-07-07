@@ -73,6 +73,18 @@ class GoogleSearchConsolePropertyRead(TimestampRead):
     is_active: bool
     token_scopes: list[str]
     token_expires_at: datetime | None
+    last_sync_at: datetime | None = None
+
+
+class GoogleSearchConsolePerformanceFilters(BaseModel):
+    """REST filters supported by the performance listing endpoint."""
+
+    start_date: date | None = None
+    end_date: date | None = None
+    page: str | None = Field(default=None, max_length=1000)
+    query: str | None = Field(default=None, max_length=1000)
+    country: str | None = Field(default=None, max_length=10)
+    device: str | None = Field(default=None, max_length=40)
 
 
 class GoogleSearchConsolePerformanceCreate(BaseModel):
@@ -178,6 +190,7 @@ class GoogleSearchConsoleSitemapRead(TimestampRead):
     warnings: int
     errors: int
     contents: dict[str, Any] | None
+    url_count: int = 0
 
 
 class GoogleSearchConsoleImportCreate(BaseModel):
@@ -216,10 +229,19 @@ class GoogleSearchConsoleImportRead(TimestampRead):
     error_message: str | None
     started_at: datetime | None
     completed_at: datetime | None
+    duration_seconds: float | None = None
 
 
 GoogleSearchConsolePropertyList = PaginatedResponse[GoogleSearchConsolePropertyRead]
 GoogleSearchConsolePerformanceList = PaginatedResponse[GoogleSearchConsolePerformanceRead]
-GoogleSearchConsoleIndexCoverageList = PaginatedResponse[GoogleSearchConsoleIndexCoverageRead]
 GoogleSearchConsoleSitemapList = PaginatedResponse[GoogleSearchConsoleSitemapRead]
 GoogleSearchConsoleImportList = PaginatedResponse[GoogleSearchConsoleImportRead]
+
+
+class GoogleSearchConsoleIndexCoverageList(PaginatedResponse[GoogleSearchConsoleIndexCoverageRead]):
+    """Paginated index coverage rows with backend-computed aggregates."""
+
+    valid_pages: int = 0
+    excluded_pages: int = 0
+    errors: int = 0
+    warnings: int = 0

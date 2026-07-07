@@ -1,6 +1,6 @@
 """Tests for Google Search Console repository."""
 
-from datetime import date
+from datetime import date, datetime, timedelta
 
 from sqlalchemy.orm import Session
 
@@ -146,3 +146,103 @@ def test_google_search_console_repository_filters_lists_by_property(db_session: 
 
     assert total == 1
     assert items[0].property_id == first_property.id
+
+
+def test_google_search_console_repository_filters_performances(db_session: Session) -> None:
+    """The repository applies SQL filters to stored performance rows."""
+
+    repository = GoogleSearchConsoleRepository(db_session)
+    property_item = repository.create(
+        {
+            "google_property_id": "sc-domain:example.com",
+            "property_url": "sc-domain:example.com",
+            "property_type": "DOMAIN",
+        },
+    )
+    repository.upsert_performance(
+        {
+            "property_id": property_item.id,
+            "date": date(2026, 7, 1),
+            "query": "audit seo",
+            "page": "https://example.com/audit",
+            "country": "FRA",
+            "device": "DESKTOP",
+            "search_type": "web",
+        },
+    )
+    repository.upsert_performance(
+        {
+            "property_id": property_item.id,
+            "date": date(2026, 7, 3),
+            "query": "veille geo",
+            "page": "https://example.com/geo",
+            "country": "BEL",
+            "device": "MOBILE",
+            "search_type": "web",
+        },
+    )
+
+    items, total = repository.list_performances(
+        PaginationParams(),
+        property_id=property_item.id,
+        start_date=date(2026, 7, 1),
+        end_date=date(2026, 7, 2),
+        page="https://example.com/audit",
+        query="audit seo",
+        country="FRA",
+        device="DESKTOP",
+    )
+
+    assert total == 1
+    assert items[0].query == "audit seo"
+    assert items[0].page == "https://example.com/audit"
+
+
+def test_google_search_console_repository_reads_sync_dates_and_index_statuses(db_session: Session) -> None:
+    """The repository exposes raw data needed by service-level calculations."""
+
+    repository = GoogleSearchConsoleRepository(db_session)
+    property_item = repository.create(
+        {
+            "google_property_id": "sc-domain:example.com",
+            "property_url": "sc-domain:example.com",
+            "property_type": "DOMAIN",
+        },
+    )
+    completed_at = datetime(2026, 7, 7, 12, 0, 0)
+    older_completed_at = completed_at - timedelta(hours=1)
+    repository.create_import(
+        {
+            "property_id": property_item.id,
+            "import_type": "MANUAL",
+            "status": "COMPLETED",
+            "completed_at": older_completed_at,
+        },
+    )
+    repository.create_import(
+        {
+            "property_id": property_item.id,
+            "import_type": "MANUAL",
+            "status": "COMPLETED",
+            "completed_at": completed_at,
+        },
+    )
+    repository.upsert_index_coverage(
+        {
+            "property_id": property_item.id,
+            "url": "https://example.com/",
+            "coverage_state": "INDEXED",
+            "verdict": "PASS",
+        },
+    )
+
+    latest_by_id = repository.get_latest_import_completed_at_by_property_ids(
+        [property_item.id],
+        statuses=("COMPLETED",),
+    )
+
+    assert repository.get_latest_import_completed_at(property_item.id, statuses=("COMPLETED",)) == completed_at
+    assert latest_by_id == {property_item.id: completed_at}
+    assert repository.list_index_coverage_statuses(property_id=property_item.id) == [
+        ("INDEXED", "PASS", None, None),
+    ]

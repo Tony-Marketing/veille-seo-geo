@@ -52,6 +52,10 @@ def _import_payload(import_id: int = 1) -> dict[str, object]:
 class FakeGoogleSearchConsoleService:
     """Route service stub."""
 
+    def __init__(self) -> None:
+        self.performance_params = None
+        self.performance_filters = None
+
     def list_properties(self, params: object) -> dict[str, object]:
         return {"items": [_property_payload()], "total": 1, "page": 1, "page_size": 20, "pages": 1}
 
@@ -79,7 +83,15 @@ class FakeGoogleSearchConsoleService:
     def delete_property(self, property_id: int) -> None:
         return None
 
-    def list_performances(self, params: object, *, property_id: int | None = None) -> dict[str, object]:
+    def list_performances(
+        self,
+        params: object,
+        *,
+        property_id: int | None = None,
+        filters: object | None = None,
+    ) -> dict[str, object]:
+        self.performance_params = params
+        self.performance_filters = filters
         now = _now()
         return {
             "items": [
@@ -193,7 +205,8 @@ def test_google_search_console_routes_allow_user_with_permissions(
 ) -> None:
     """Google Search Console routes allow users with crawl read and write permissions."""
 
-    client.app.dependency_overrides[google_search_console.get_service] = lambda: FakeGoogleSearchConsoleService()
+    fake_service = FakeGoogleSearchConsoleService()
+    client.app.dependency_overrides[google_search_console.get_service] = lambda: fake_service
     headers = auth_headers_for(permission_codes=["crawl.read", "crawl.write"])
     try:
         assert client.get("/api/v1/google-search-console/properties", headers=headers).status_code == 200
@@ -216,7 +229,26 @@ def test_google_search_console_routes_allow_user_with_permissions(
             json={"access_token": "access-token", "refresh_token": "refresh-token"},
         )
         assert oauth_response.status_code == 200
-        assert client.get("/api/v1/google-search-console/performances", headers=headers).status_code == 200
+        performances_response = client.get(
+            "/api/v1/google-search-console/performances",
+            headers=headers,
+            params={
+                "start_date": "2026-07-01",
+                "end_date": "2026-07-07",
+                "page": "https://example.com/",
+                "query": "audit seo",
+                "country": "FRA",
+                "device": "DESKTOP",
+            },
+        )
+        assert performances_response.status_code == 200
+        assert fake_service.performance_filters is not None
+        assert fake_service.performance_filters.start_date == date(2026, 7, 1)
+        assert fake_service.performance_filters.end_date == date(2026, 7, 7)
+        assert fake_service.performance_filters.page == "https://example.com/"
+        assert fake_service.performance_filters.query == "audit seo"
+        assert fake_service.performance_filters.country == "FRA"
+        assert fake_service.performance_filters.device == "DESKTOP"
         assert client.get("/api/v1/google-search-console/indexation", headers=headers).status_code == 200
         assert client.get("/api/v1/google-search-console/sitemaps", headers=headers).status_code == 200
         import_response = client.post(
