@@ -7,6 +7,7 @@ from core.constants import (
     NAVIGATION_PAGES,
     PAGE_DASHBOARD,
     PAGE_GEO_ANALYSIS,
+    PAGE_GOOGLE_SEARCH_CONSOLE,
     PAGE_WEBSITES,
 )
 from PySide6.QtWidgets import QApplication, QWidget
@@ -52,6 +53,7 @@ def page_creation_log(monkeypatch: pytest.MonkeyPatch, qt_app: QApplication) -> 
     monkeypatch.setattr(main_window_module, "KeywordsPage", fake_page_class("Keywords"))
     monkeypatch.setattr(main_window_module, "CompetitorsPage", fake_page_class("Competitors"))
     monkeypatch.setattr(main_window_module, "CrawlsPage", fake_page_class("Crawls"))
+    monkeypatch.setattr(main_window_module, "GSCPage", fake_page_class(PAGE_GOOGLE_SEARCH_CONSOLE))
     monkeypatch.setattr(main_window_module, "GeoAnalysisPage", fake_page_class(PAGE_GEO_ANALYSIS))
     monkeypatch.setattr(main_window_module, "ProjectTasksPage", fake_page_class("Project Tasks"))
     monkeypatch.setattr(main_window_module, "ReportsPage", fake_page_class("Reports"))
