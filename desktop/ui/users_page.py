@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 )
 from services.users_service import PaginatedUsersResponse, UsersService, UsersServiceError
 from ui.dialogs.user_dialog import UserDialog
+from ui.dialogs.user_invitation_dialog import UserInvitationDialog
 
 
 class UsersPage(QWidget):
@@ -53,8 +54,8 @@ class UsersPage(QWidget):
         self.refresh_button = QPushButton("Rafraichir")
         self.refresh_button.clicked.connect(self.load_data)
 
-        self.create_button = QPushButton("Ajouter")
-        self.create_button.clicked.connect(self.create_user)
+        self.create_button = QPushButton("Inviter un utilisateur")
+        self.create_button.clicked.connect(self.invite_user)
 
         self.edit_button = QPushButton("Modifier")
         self.edit_button.clicked.connect(self.edit_user)
@@ -178,22 +179,22 @@ class UsersPage(QWidget):
         self.current_page += 1
         self.load_data()
 
-    def create_user(self) -> None:
-        """Open the create dialog and create a user on confirmation."""
+    def invite_user(self) -> None:
+        """Open the invitation dialog and create an invitation on confirmation."""
 
-        dialog = UserDialog(roles=self.roles, parent=self)
+        dialog = UserInvitationDialog(roles=self.roles, parent=self)
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
 
         self._set_busy(True)
         try:
-            self.users_service.create_user(dialog.payload())
+            self.users_service.invite_user(dialog.payload())
         except UsersServiceError as exc:
             self.message.setText(self._error_message(exc))
         else:
             self.current_page = UsersService.DEFAULT_PAGE
             self.load_data()
-            self.message.setText("Utilisateur cree.")
+            self.message.setText("Utilisateur cree. Un email d'activation valable 24 heures a ete envoye.")
         finally:
             self._set_busy(False)
             self._update_pagination_actions()

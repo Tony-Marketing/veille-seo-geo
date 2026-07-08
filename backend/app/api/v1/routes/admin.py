@@ -18,7 +18,8 @@ from backend.app.repositories.admin import (
     SettingRepository,
     SystemParameterRepository,
 )
-from backend.app.repositories.auth import PermissionRepository, RoleRepository
+from backend.app.repositories.auth import PermissionRepository, RoleRepository, UserRepository
+from backend.app.repositories.user_invitations import UserInvitationRepository
 from backend.app.schemas.admin import (
     AdminDashboardRead,
     AiModelCreate,
@@ -53,6 +54,7 @@ from backend.app.schemas.admin import (
     SystemParameterRead,
     SystemParameterUpdate,
 )
+from backend.app.schemas.auth import UserInvitationCreate, UserInvitationRead
 from backend.app.schemas.pagination import PaginationParams, pagination_params
 from backend.app.services.admin import (
     AdminService,
@@ -66,6 +68,8 @@ from backend.app.services.admin import (
     SettingService,
     SystemParameterService,
 )
+from backend.app.services.email import EmailService
+from backend.app.services.user_invitations import UserInvitationService
 
 router = APIRouter(prefix="/admin", tags=["Administration"])
 
@@ -98,6 +102,26 @@ def _parameter_service(db: Session) -> SystemParameterService:
     return SystemParameterService(SystemParameterRepository(db))
 
 
+def get_email_service() -> EmailService:
+    """Return transactional email service."""
+
+    return EmailService()
+
+
+def get_user_invitation_service(
+    db: Session = Depends(get_db),
+    email_service: EmailService = Depends(get_email_service),
+) -> UserInvitationService:
+    """Return user invitation service."""
+
+    return UserInvitationService(
+        UserRepository(db),
+        RoleRepository(db),
+        UserInvitationRepository(db),
+        email_service,
+    )
+
+
 @router.get(
     "/dashboard",
     response_model=AdminDashboardRead,
@@ -107,6 +131,21 @@ def _parameter_service(db: Session) -> SystemParameterService:
 def dashboard(db: Session = Depends(get_db), _: User = Depends(require_admin)) -> AdminDashboardRead:
     service = AdminService(db, AdminRepository(db), AiProviderRepository(db), ApiKeyRepository(db))
     return service.dashboard()
+
+
+@router.post(
+    "/users/invite",
+    response_model=UserInvitationRead,
+    status_code=status.HTTP_201_CREATED,
+    summary="Inviter un utilisateur",
+    description="Cree un utilisateur inactif et envoie un email d'activation valable 24 heures.",
+)
+def invite_user(
+    payload: UserInvitationCreate,
+    service: UserInvitationService = Depends(get_user_invitation_service),
+    current_user: User = Depends(require_admin),
+) -> UserInvitationRead:
+    return service.invite_user(payload, created_by_user_id=current_user.id)
 
 
 @router.get("/settings", response_model=SettingList, summary="Lister les paramètres globaux")

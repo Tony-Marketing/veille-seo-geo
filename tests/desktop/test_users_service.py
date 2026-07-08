@@ -90,6 +90,30 @@ def test_users_service_creates_user() -> None:
     assert seen_requests == [("POST", httpx.URL("http://api.test/api/v1/users"), payload)]
 
 
+def test_users_service_invites_user() -> None:
+    """The service invites users through the administration API."""
+
+    seen_requests: list[tuple[str, httpx.URL, dict[str, object]]] = []
+    payload = {"email": "invite@example.com", "role_ids": [1]}
+    response_payload = {
+        "user_id": 2,
+        "email": "invite@example.com",
+        "expires_at": "2026-07-09T12:00:00Z",
+        "message": "Utilisateur cree. Un email d'activation valable 24 heures a ete envoye.",
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen_requests.append((request.method, request.url, json.loads(request.content.decode())))
+        return httpx.Response(201, json=response_payload)
+
+    service = UsersService(_client_with_handler(handler))
+
+    result = service.invite_user(payload)
+
+    assert result == response_payload
+    assert seen_requests == [("POST", httpx.URL("http://api.test/api/v1/admin/users/invite"), payload)]
+
+
 def test_users_service_updates_user() -> None:
     """The service updates users through the API."""
 
