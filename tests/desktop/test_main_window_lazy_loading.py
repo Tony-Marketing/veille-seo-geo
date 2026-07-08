@@ -8,6 +8,7 @@ from core.constants import (
     PAGE_DASHBOARD,
     PAGE_GEO_ANALYSIS,
     PAGE_GOOGLE_SEARCH_CONSOLE,
+    PAGE_USERS,
     PAGE_WEBSITES,
 )
 from PySide6.QtWidgets import QApplication, QWidget
@@ -58,6 +59,7 @@ def page_creation_log(monkeypatch: pytest.MonkeyPatch, qt_app: QApplication) -> 
     monkeypatch.setattr(main_window_module, "ProjectTasksPage", fake_page_class("Project Tasks"))
     monkeypatch.setattr(main_window_module, "ReportsPage", fake_page_class("Reports"))
     monkeypatch.setattr(main_window_module, "AdministrationPage", fake_page_class("Administration"))
+    monkeypatch.setattr(main_window_module, "UsersPage", fake_page_class(PAGE_USERS))
     monkeypatch.setattr(main_window_module.MainWindow, "_show_login_dialog", lambda self: True)
 
     yield created
