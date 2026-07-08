@@ -10,6 +10,14 @@ from backend.app.models.admin import (
     SystemParameter,
 )
 from backend.app.models.auth import Permission, Role, User, role_permissions, user_roles
+from backend.app.models.bing_webmaster_tools import (
+    BingWebmasterConnection,
+    BingWebmasterCrawlStat,
+    BingWebmasterImportRun,
+    BingWebmasterMetric,
+    BingWebmasterSite,
+    BingWebmasterSitemap,
+)
 from backend.app.models.crawls import CrawlPage, CrawlSession
 from backend.app.models.entities import Competitor, Entity, Keyword, ProjectTask, Report, Url, Website
 from backend.app.models.geo_analysis import GeoAnalysis, GeoProviderResult, GeoRecommendation
@@ -34,6 +42,12 @@ __all__ = [
     "ApiKey",
     "ApplicationSetting",
     "AuditLog",
+    "BingWebmasterConnection",
+    "BingWebmasterCrawlStat",
+    "BingWebmasterImportRun",
+    "BingWebmasterMetric",
+    "BingWebmasterSite",
+    "BingWebmasterSitemap",
     "Competitor",
     "CrawlPage",
     "CrawlSession",
