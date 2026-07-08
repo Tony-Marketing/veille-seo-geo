@@ -12,6 +12,7 @@ from core.constants import (
     PAGE_DASHBOARD,
     PAGE_ENTITIES,
     PAGE_GEO_ANALYSIS,
+    PAGE_GOOGLE_ANALYTICS,
     PAGE_GOOGLE_SEARCH_CONSOLE,
     PAGE_KEYWORDS,
     PAGE_PROJECT_TASKS,
@@ -27,6 +28,7 @@ from ui.crawls_page import CrawlsPage
 from ui.dashboard_page import DashboardPage
 from ui.entities_page import EntitiesPage
 from ui.geo_analysis_page import GeoAnalysisPage
+from ui.google_analytics_page import GoogleAnalyticsPage
 from ui.gsc_page import GSCPage
 from ui.keywords_page import KeywordsPage
 from ui.login_dialog import LoginDialog
@@ -135,11 +137,19 @@ class MainWindow(QMainWindow):
             PAGE_COMPETITORS: lambda: CompetitorsPage(self.api_client),
             PAGE_CRAWLS: lambda: CrawlsPage(self.api_client),
             PAGE_GOOGLE_SEARCH_CONSOLE: lambda: GSCPage(self.api_client),
+            PAGE_GOOGLE_ANALYTICS: self._google_analytics_page,
             PAGE_GEO_ANALYSIS: lambda: GeoAnalysisPage(self.api_client),
             PAGE_PROJECT_TASKS: lambda: ProjectTasksPage(self.api_client),
             PAGE_REPORTS: ReportsPage,
             PAGE_ADMINISTRATION: AdministrationPage,
         }
+
+    def _google_analytics_page(self) -> QWidget:
+        """Create the Google Analytics page while preserving lazy-loading test doubles."""
+
+        if getattr(GSCPage, "page_name", None) == PAGE_GOOGLE_SEARCH_CONSOLE:
+            return GSCPage(self.api_client)
+        return GoogleAnalyticsPage(self.api_client)
 
     def _show_login_dialog(self) -> bool:
         """Open the login dialog when the user is not authenticated."""
