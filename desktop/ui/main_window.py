@@ -17,6 +17,7 @@ from core.constants import (
     PAGE_KEYWORDS,
     PAGE_PROJECT_TASKS,
     PAGE_REPORTS,
+    PAGE_USERS,
     PAGE_WEBSITES,
 )
 from core.session import DesktopSession
@@ -34,6 +35,7 @@ from ui.keywords_page import KeywordsPage
 from ui.login_dialog import LoginDialog
 from ui.project_tasks_page import ProjectTasksPage
 from ui.reports_page import ReportsPage
+from ui.users_page import UsersPage
 from ui.websites_page import WebsitesPage
 from widgets.sidebar import Sidebar
 from widgets.statusbar import StatusBar
@@ -142,6 +144,7 @@ class MainWindow(QMainWindow):
             PAGE_PROJECT_TASKS: lambda: ProjectTasksPage(self.api_client),
             PAGE_REPORTS: ReportsPage,
             PAGE_ADMINISTRATION: AdministrationPage,
+            PAGE_USERS: lambda: UsersPage(self.api_client),
         }
 
     def _google_analytics_page(self) -> QWidget:
