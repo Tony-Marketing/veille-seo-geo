@@ -7,6 +7,7 @@ from core.api_client import ApiClient
 from core.config import APP_NAME
 from core.constants import (
     PAGE_ADMINISTRATION,
+    PAGE_BING_WEBMASTER_TOOLS,
     PAGE_COMPETITORS,
     PAGE_CRAWLS,
     PAGE_DASHBOARD,
@@ -23,6 +24,7 @@ from core.session import DesktopSession
 from PySide6.QtWidgets import QDialog, QHBoxLayout, QMainWindow, QStackedWidget, QVBoxLayout, QWidget
 from services.auth_service import AuthService
 from ui.administration_page import AdministrationPage
+from ui.bing_webmaster_tools_page import BingWebmasterToolsPage
 from ui.competitors_page import CompetitorsPage
 from ui.crawls_page import CrawlsPage
 from ui.dashboard_page import DashboardPage
@@ -138,6 +140,7 @@ class MainWindow(QMainWindow):
             PAGE_CRAWLS: lambda: CrawlsPage(self.api_client),
             PAGE_GOOGLE_SEARCH_CONSOLE: lambda: GSCPage(self.api_client),
             PAGE_GOOGLE_ANALYTICS: self._google_analytics_page,
+            PAGE_BING_WEBMASTER_TOOLS: lambda: BingWebmasterToolsPage(self.api_client),
             PAGE_GEO_ANALYSIS: lambda: GeoAnalysisPage(self.api_client),
             PAGE_PROJECT_TASKS: lambda: ProjectTasksPage(self.api_client),
             PAGE_REPORTS: ReportsPage,
