@@ -78,6 +78,11 @@ class UsersService:
 
         return self._send_resource("post", "/users", payload=payload, resource_name="utilisateur")
 
+    def invite_user(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Invite a user through the administration REST API."""
+
+        return self._send_resource("post", "/admin/users/invite", payload=payload, resource_name="invitation")
+
     def update_user(self, user_id: int, payload: dict[str, Any]) -> dict[str, Any]:
         """Update a user through the REST API."""
 

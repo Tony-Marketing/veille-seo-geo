@@ -82,16 +82,9 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(container)
 
         self.show_page(PAGE_DASHBOARD)
-        self._show_login_dialog()
 
     def show_page(self, page_name: str) -> None:
         """Display a page by navigation name."""
-
-        if page_name != PAGE_DASHBOARD and not self.session.is_authenticated:
-            if not self._show_login_dialog():
-                self.status_bar.set_message("Connexion requise.")
-                self.sidebar.select_page(PAGE_DASHBOARD)
-                return
 
         page = self.get_page(page_name)
         if page is None:

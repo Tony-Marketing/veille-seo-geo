@@ -60,7 +60,11 @@ def page_creation_log(monkeypatch: pytest.MonkeyPatch, qt_app: QApplication) -> 
     monkeypatch.setattr(main_window_module, "ReportsPage", fake_page_class("Reports"))
     monkeypatch.setattr(main_window_module, "AdministrationPage", fake_page_class("Administration"))
     monkeypatch.setattr(main_window_module, "UsersPage", fake_page_class(PAGE_USERS))
-    monkeypatch.setattr(main_window_module.MainWindow, "_show_login_dialog", lambda self: True)
+
+    def unexpected_login_dialog(_self: object) -> bool:
+        raise AssertionError("LoginDialog must not open automatically")
+
+    monkeypatch.setattr(main_window_module.MainWindow, "_show_login_dialog", unexpected_login_dialog)
 
     yield created
 

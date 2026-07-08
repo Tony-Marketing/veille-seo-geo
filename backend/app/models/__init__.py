@@ -35,6 +35,7 @@ from backend.app.models.google_search_console import (
     GoogleSearchConsoleSitemap,
 )
 from backend.app.models.seo_analysis import SeoAnalysis, SeoAnalysisIssue, SeoPageAnalysis
+from backend.app.models.user_invitation import UserInvitation
 
 __all__ = [
     "AiModel",
@@ -76,6 +77,7 @@ __all__ = [
     "SystemParameter",
     "Url",
     "User",
+    "UserInvitation",
     "Website",
     "role_permissions",
     "user_roles",

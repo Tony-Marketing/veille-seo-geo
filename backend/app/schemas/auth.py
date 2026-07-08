@@ -1,5 +1,7 @@
 """Schémas Pydantic d'authentification."""
 
+from datetime import datetime
+
 from pydantic import BaseModel, EmailStr, Field
 
 from backend.app.schemas.common import TimestampRead
@@ -98,6 +100,22 @@ class UserRead(TimestampRead):
     roles: list[RoleRead] = Field(default_factory=list)
 
 
+class UserInvitationCreate(BaseModel):
+    """Payload d'invitation utilisateur par email."""
+
+    email: EmailStr
+    role_ids: list[int] = Field(default_factory=list)
+
+
+class UserInvitationRead(BaseModel):
+    """Réponse après création d'une invitation utilisateur."""
+
+    user_id: int
+    email: EmailStr
+    expires_at: datetime
+    message: str
+
+
 class LoginRequest(BaseModel):
     """Payload de connexion."""
 
@@ -110,6 +128,21 @@ class TokenResponse(BaseModel):
 
     access_token: str
     token_type: str = "bearer"
+
+
+class AccountActivationRequest(BaseModel):
+    """Payload d'activation de compte invité."""
+
+    token: str = Field(min_length=32)
+    password: str = Field(min_length=8)
+
+
+class AccountActivationResponse(BaseModel):
+    """Réponse d'activation de compte."""
+
+    email: EmailStr
+    is_active: bool
+    message: str
 
 
 PermissionList = PaginatedResponse[PermissionRead]
