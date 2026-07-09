@@ -64,6 +64,11 @@ class ApiClient:
 
         return self._request("PUT", path, json=json)
 
+    def patch(self, path: str, json: dict[str, Any] | None = None) -> Any:
+        """Execute une requete PATCH vers l'API."""
+
+        return self._request("PATCH", path, json=json)
+
     def delete(self, path: str) -> Any:
         """Execute une requete DELETE vers l'API."""
 
