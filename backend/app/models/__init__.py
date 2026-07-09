@@ -34,6 +34,7 @@ from backend.app.models.google_search_console import (
     GoogleSearchConsoleProperty,
     GoogleSearchConsoleSitemap,
 )
+from backend.app.models.monitoring_event import MonitoringEvent
 from backend.app.models.seo_analysis import SeoAnalysis, SeoAnalysisIssue, SeoPageAnalysis
 from backend.app.models.sync_schedule import SyncSchedule
 from backend.app.models.user_invitation import UserInvitation
@@ -68,6 +69,7 @@ __all__ = [
     "GoogleSearchConsoleProperty",
     "GoogleSearchConsoleSitemap",
     "Keyword",
+    "MonitoringEvent",
     "Permission",
     "ProjectTask",
     "Report",
