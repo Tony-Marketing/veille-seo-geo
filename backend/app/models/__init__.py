@@ -35,6 +35,7 @@ from backend.app.models.google_search_console import (
     GoogleSearchConsoleSitemap,
 )
 from backend.app.models.seo_analysis import SeoAnalysis, SeoAnalysisIssue, SeoPageAnalysis
+from backend.app.models.sync_schedule import SyncSchedule
 from backend.app.models.user_invitation import UserInvitation
 
 __all__ = [
@@ -74,6 +75,7 @@ __all__ = [
     "SeoAnalysis",
     "SeoAnalysisIssue",
     "SeoPageAnalysis",
+    "SyncSchedule",
     "SystemParameter",
     "Url",
     "User",

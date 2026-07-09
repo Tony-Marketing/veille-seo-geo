@@ -19,6 +19,7 @@ from backend.app.api.v1.routes import (
     reports,
     roles,
     seo_analysis,
+    sync_schedules,
     urls,
     users,
     websites,
@@ -43,6 +44,7 @@ api_router.include_router(geo_analysis.router)
 api_router.include_router(google_analytics.router)
 api_router.include_router(google_search_console.router)
 api_router.include_router(bing_webmaster_tools.router)
+api_router.include_router(sync_schedules.router)
 api_router.include_router(admin.router)
 
 router = api_router
