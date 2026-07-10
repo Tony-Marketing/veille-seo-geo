@@ -9,6 +9,7 @@ from backend.app.models.admin import (
     ErrorLog,
     SystemParameter,
 )
+from backend.app.models.alert import Alert
 from backend.app.models.auth import Permission, Role, User, role_permissions, user_roles
 from backend.app.models.bing_webmaster_tools import (
     BingWebmasterConnection,
@@ -44,6 +45,7 @@ __all__ = [
     "AiProvider",
     "ApiKey",
     "ApplicationSetting",
+    "Alert",
     "AuditLog",
     "BingWebmasterConnection",
     "BingWebmasterCrawlStat",
