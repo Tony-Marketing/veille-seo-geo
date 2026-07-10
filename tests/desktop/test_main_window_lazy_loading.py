@@ -5,6 +5,7 @@ from collections.abc import Iterator
 import pytest
 from core.constants import (
     NAVIGATION_PAGES,
+    PAGE_ALERTS,
     PAGE_DASHBOARD,
     PAGE_GEO_ANALYSIS,
     PAGE_GOOGLE_SEARCH_CONSOLE,
@@ -60,6 +61,7 @@ def page_creation_log(monkeypatch: pytest.MonkeyPatch, qt_app: QApplication) -> 
     monkeypatch.setattr(main_window_module, "GeoAnalysisPage", fake_page_class(PAGE_GEO_ANALYSIS))
     monkeypatch.setattr(main_window_module, "SyncSchedulesPage", fake_page_class(PAGE_SYNC_SCHEDULES))
     monkeypatch.setattr(main_window_module, "MonitoringPage", fake_page_class(PAGE_MONITORING))
+    monkeypatch.setattr(main_window_module, "AlertsPage", fake_page_class(PAGE_ALERTS))
     monkeypatch.setattr(main_window_module, "ProjectTasksPage", fake_page_class("Project Tasks"))
     monkeypatch.setattr(main_window_module, "ReportsPage", fake_page_class("Reports"))
     monkeypatch.setattr(main_window_module, "AdministrationPage", fake_page_class("Administration"))

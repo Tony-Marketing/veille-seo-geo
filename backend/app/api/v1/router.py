@@ -4,6 +4,7 @@ from fastapi import APIRouter
 
 from backend.app.api.v1.routes import (
     admin,
+    alerts,
     auth,
     bing_webmaster_tools,
     competitors,
@@ -47,6 +48,7 @@ api_router.include_router(google_search_console.router)
 api_router.include_router(bing_webmaster_tools.router)
 api_router.include_router(sync_schedules.router)
 api_router.include_router(monitoring.router)
+api_router.include_router(alerts.router)
 api_router.include_router(admin.router)
 
 router = api_router

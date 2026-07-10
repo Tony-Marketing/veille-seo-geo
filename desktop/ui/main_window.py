@@ -7,6 +7,7 @@ from core.api_client import ApiClient
 from core.config import APP_NAME
 from core.constants import (
     PAGE_ADMINISTRATION,
+    PAGE_ALERTS,
     PAGE_COMPETITORS,
     PAGE_CRAWLS,
     PAGE_DASHBOARD,
@@ -26,6 +27,7 @@ from core.session import DesktopSession
 from PySide6.QtWidgets import QDialog, QHBoxLayout, QMainWindow, QStackedWidget, QVBoxLayout, QWidget
 from services.auth_service import AuthService
 from ui.administration_page import AdministrationPage
+from ui.alerts_page import AlertsPage
 from ui.competitors_page import CompetitorsPage
 from ui.crawls_page import CrawlsPage
 from ui.dashboard_page import DashboardPage
@@ -140,6 +142,7 @@ class MainWindow(QMainWindow):
             PAGE_GEO_ANALYSIS: lambda: GeoAnalysisPage(self.api_client),
             PAGE_SYNC_SCHEDULES: lambda: SyncSchedulesPage(self.api_client),
             PAGE_MONITORING: lambda: MonitoringPage(self.api_client),
+            PAGE_ALERTS: lambda: AlertsPage(self.api_client),
             PAGE_PROJECT_TASKS: lambda: ProjectTasksPage(self.api_client),
             PAGE_REPORTS: ReportsPage,
             PAGE_ADMINISTRATION: AdministrationPage,
