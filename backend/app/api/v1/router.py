@@ -10,6 +10,7 @@ from backend.app.api.v1.routes import (
     competitors,
     crawls,
     dashboard,
+    dashboard_v2,
     entities,
     geo_analysis,
     google_analytics,
@@ -38,6 +39,7 @@ api_router.include_router(websites.router)
 api_router.include_router(competitors.router)
 api_router.include_router(crawls.router)
 api_router.include_router(dashboard.router)
+api_router.include_router(dashboard_v2.router)
 api_router.include_router(keywords.router)
 api_router.include_router(urls.router)
 api_router.include_router(reports.router)
