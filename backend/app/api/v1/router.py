@@ -16,6 +16,7 @@ from backend.app.api.v1.routes import (
     google_search_console,
     keywords,
     monitoring,
+    orchestration,
     permissions,
     project_tasks,
     reports,
@@ -49,6 +50,7 @@ api_router.include_router(bing_webmaster_tools.router)
 api_router.include_router(sync_schedules.router)
 api_router.include_router(monitoring.router)
 api_router.include_router(alerts.router)
+api_router.include_router(orchestration.router)
 api_router.include_router(admin.router)
 
 router = api_router

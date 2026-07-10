@@ -36,6 +36,9 @@ from backend.app.models.google_search_console import (
     GoogleSearchConsoleSitemap,
 )
 from backend.app.models.monitoring_event import MonitoringEvent
+from backend.app.models.processing_job import ProcessingJob
+from backend.app.models.processing_job_log import ProcessingJobLog
+from backend.app.models.processing_worker import ProcessingWorker
 from backend.app.models.seo_analysis import SeoAnalysis, SeoAnalysisIssue, SeoPageAnalysis
 from backend.app.models.sync_schedule import SyncSchedule
 from backend.app.models.user_invitation import UserInvitation
@@ -73,6 +76,9 @@ __all__ = [
     "Keyword",
     "MonitoringEvent",
     "Permission",
+    "ProcessingJob",
+    "ProcessingJobLog",
+    "ProcessingWorker",
     "ProjectTask",
     "Report",
     "Role",

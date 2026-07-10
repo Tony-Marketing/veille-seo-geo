@@ -17,6 +17,7 @@ from core.constants import (
     PAGE_GOOGLE_SEARCH_CONSOLE,
     PAGE_KEYWORDS,
     PAGE_MONITORING,
+    PAGE_ORCHESTRATION,
     PAGE_PROJECT_TASKS,
     PAGE_REPORTS,
     PAGE_SYNC_SCHEDULES,
@@ -38,6 +39,7 @@ from ui.gsc_page import GSCPage
 from ui.keywords_page import KeywordsPage
 from ui.login_dialog import LoginDialog
 from ui.monitoring_page import MonitoringPage
+from ui.orchestration_page import OrchestrationPage
 from ui.project_tasks_page import ProjectTasksPage
 from ui.reports_page import ReportsPage
 from ui.sync_schedules_page import SyncSchedulesPage
@@ -143,6 +145,7 @@ class MainWindow(QMainWindow):
             PAGE_SYNC_SCHEDULES: lambda: SyncSchedulesPage(self.api_client),
             PAGE_MONITORING: lambda: MonitoringPage(self.api_client),
             PAGE_ALERTS: lambda: AlertsPage(self.api_client),
+            PAGE_ORCHESTRATION: lambda: OrchestrationPage(self.api_client),
             PAGE_PROJECT_TASKS: lambda: ProjectTasksPage(self.api_client),
             PAGE_REPORTS: ReportsPage,
             PAGE_ADMINISTRATION: AdministrationPage,
