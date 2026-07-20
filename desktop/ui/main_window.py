@@ -14,6 +14,7 @@ from core.constants import (
     PAGE_DASHBOARD,
     PAGE_ENTITIES,
     PAGE_GEO_ANALYSIS,
+    PAGE_GEO_INTELLIGENCE,
     PAGE_GOOGLE_ANALYTICS,
     PAGE_GOOGLE_SEARCH_CONSOLE,
     PAGE_KEYWORDS,
@@ -39,6 +40,7 @@ from ui.crawls_page import CrawlsPage
 from ui.dashboard_page import DashboardPage
 from ui.entities_page import EntitiesPage
 from ui.geo_analysis_page import GeoAnalysisPage
+from ui.geo_intelligence_page import GeoIntelligencePage
 from ui.google_analytics_page import GoogleAnalyticsPage
 from ui.gsc_page import GSCPage
 from ui.keywords_page import KeywordsPage
@@ -153,6 +155,7 @@ class MainWindow(QMainWindow):
             PAGE_GOOGLE_SEARCH_CONSOLE: lambda: GSCPage(self.api_client),
             PAGE_GOOGLE_ANALYTICS: self._google_analytics_page,
             PAGE_GEO_ANALYSIS: lambda: GeoAnalysisPage(self.api_client),
+            PAGE_GEO_INTELLIGENCE: lambda: GeoIntelligencePage(self.api_client),
             PAGE_BING_WEBMASTER_TOOLS: lambda: BingWebmasterToolsPage(self.api_client),
             PAGE_SYNC_SCHEDULES: lambda: SyncSchedulesPage(self.api_client),
             PAGE_MONITORING: lambda: MonitoringPage(self.api_client),
@@ -291,6 +294,7 @@ class MainWindow(QMainWindow):
             PAGE_CRAWLS: "load_crawls",
             PAGE_SEO_ANALYSIS: "load_data",
             PAGE_GEO_ANALYSIS: "load_geo_analyses",
+            PAGE_GEO_INTELLIGENCE: "load_data",
             PAGE_GOOGLE_SEARCH_CONSOLE: "load_data",
             PAGE_GOOGLE_ANALYTICS: "load_data",
             PAGE_BING_WEBMASTER_TOOLS: "load_data",

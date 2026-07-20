@@ -50,6 +50,7 @@ def test_dashboard_v2_page_loads_progressive_sections(monkeypatch, qt_app: QAppl
                     "global_health": {"score": 82},
                     "seo": {"average_score": 75},
                     "geo": {"geo_score": 70},
+                    "geo_intelligence": {"average_visibility_score": 35},
                     "gsc": {"clicks": 10},
                     "ga4": {"sessions": 20},
                     "bing": {"clicks": 5},
@@ -110,6 +111,7 @@ def test_dashboard_v2_page_loads_progressive_sections(monkeypatch, qt_app: QAppl
 
     assert calls == ["overview", "trends", "websites", "recommendations"]
     assert page.cards["health_score"].text() == "82.0"
+    assert page.cards["geo_visibility_score"].text() == "35.0"
     assert page.websites_table.rowCount() == 1
     assert page.recommendations_table.rowCount() == 1
     assert page.trends_table.rowCount() == 1

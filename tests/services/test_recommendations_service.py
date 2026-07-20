@@ -5,7 +5,16 @@ from uuid import uuid4
 
 from sqlalchemy.orm import Session
 
-from backend.app.models import Alert, CrawlSession, MonitoringEvent, SeoAnalysis, SeoAnalysisIssue, Website
+from backend.app.models import (
+    Alert,
+    CrawlSession,
+    GeoVisibilitySnapshot,
+    MonitoringEvent,
+    SeoAnalysis,
+    SeoAnalysisIssue,
+    Website,
+)
+from backend.app.repositories.geo_intelligence import GeoIntelligenceRepository
 from backend.app.repositories.recommendations import RecommendationRepository
 from backend.app.schemas.pagination import PaginationParams
 from backend.app.schemas.recommendations import (
@@ -14,6 +23,7 @@ from backend.app.schemas.recommendations import (
     RecommendationSource,
     RecommendationStatus,
 )
+from backend.app.services.geo_intelligence import GeoIntelligenceService
 from backend.app.services.recommendations import RecommendationCandidate, RecommendationService
 
 
@@ -127,3 +137,34 @@ def test_recommendation_deduplication_key_ignores_presentation_text() -> None:
     second = RecommendationCandidate(title="Titre B", **{**values, "description": "Description B"})
 
     assert RecommendationService.deduplication_key(first) == RecommendationService.deduplication_key(second)
+
+
+def test_recommendation_service_consumes_geo_intelligence_signals(db_session: Session) -> None:
+    website = Website(name="Recommendation GEO", url="https://recommendation-geo.example", is_active=True)
+    db_session.add(website)
+    db_session.commit()
+    db_session.add(
+        GeoVisibilitySnapshot(
+            website_id=website.id,
+            provider="chatgpt",
+            prompt="Prompt",
+            entity="Marque",
+            visibility_score=20,
+            citation_count=0,
+            source_count=1,
+            answer_hash="c" * 64,
+            captured_at=datetime(2026, 7, 20, tzinfo=UTC),
+        ),
+    )
+    db_session.commit()
+    geo_service = GeoIntelligenceService(GeoIntelligenceRepository(db_session))
+    service = RecommendationService(RecommendationRepository(db_session), geo_service)
+
+    result = service.list_recommendations(PaginationParams())
+
+    geo_items = [item for item in result.items if item.source == RecommendationSource.GEO_INTELLIGENCE]
+    assert {item.metadata["rule_code"] for item in geo_items} == {
+        "low_visibility",
+        "insufficient_source_diversity",
+    }
+    assert all(item.impact == RecommendationImpact.GEO for item in geo_items)

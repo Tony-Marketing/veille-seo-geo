@@ -23,6 +23,7 @@ class DashboardV2Source(StrEnum):
 
     SEO = "seo"
     GEO = "geo"
+    GEO_INTELLIGENCE = "geo_intelligence"
     GSC = "gsc"
     GA4 = "ga4"
     BING = "bing"
@@ -55,6 +56,7 @@ class DashboardV2TrendMetric(StrEnum):
 
     SEO_SCORE = "seo_score"
     GEO_SCORE = "geo_score"
+    GEO_VISIBILITY_SCORE = "geo_visibility_score"
     GSC_CLICKS = "gsc_clicks"
     GSC_IMPRESSIONS = "gsc_impressions"
     GA4_SESSIONS = "ga4_sessions"
@@ -172,6 +174,18 @@ class DashboardV2GeoKpis(BaseModel):
     recommendations_count: int = 0
     priority_recommendations: int = 0
     latest_analysis_at: datetime | None = None
+
+
+class DashboardV2GeoIntelligenceKpis(BaseModel):
+    """Consolidated GEO Intelligence KPIs supplied by its business service."""
+
+    captures: int = 0
+    average_visibility_score: float | None = None
+    providers_covered: list[str] = Field(default_factory=list)
+    citation_count: int = 0
+    source_count: int = 0
+    appearance_frequency: float | None = None
+    latest_capture_at: datetime | None = None
 
 
 class DashboardV2GscKpis(BaseModel):
@@ -361,6 +375,7 @@ class DashboardV2OverviewResponse(BaseModel):
     global_health: DashboardV2HealthScore
     seo: DashboardV2SeoKpis
     geo: DashboardV2GeoKpis
+    geo_intelligence: DashboardV2GeoIntelligenceKpis = Field(default_factory=DashboardV2GeoIntelligenceKpis)
     gsc: DashboardV2GscKpis
     ga4: DashboardV2Ga4Kpis
     bing: DashboardV2BingKpis

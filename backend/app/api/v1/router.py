@@ -13,6 +13,7 @@ from backend.app.api.v1.routes import (
     dashboard_v2,
     entities,
     geo_analysis,
+    geo_intelligence,
     google_analytics,
     google_search_console,
     keywords,
@@ -48,6 +49,7 @@ api_router.include_router(project_tasks.router)
 api_router.include_router(recommendations.router)
 api_router.include_router(seo_analysis.router)
 api_router.include_router(geo_analysis.router)
+api_router.include_router(geo_intelligence.router)
 api_router.include_router(google_analytics.router)
 api_router.include_router(google_search_console.router)
 api_router.include_router(bing_webmaster_tools.router)
