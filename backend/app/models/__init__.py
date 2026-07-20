@@ -39,6 +39,7 @@ from backend.app.models.monitoring_event import MonitoringEvent
 from backend.app.models.processing_job import ProcessingJob
 from backend.app.models.processing_job_log import ProcessingJobLog
 from backend.app.models.processing_worker import ProcessingWorker
+from backend.app.models.recommendation import Recommendation
 from backend.app.models.seo_analysis import SeoAnalysis, SeoAnalysisIssue, SeoPageAnalysis
 from backend.app.models.sync_schedule import SyncSchedule
 from backend.app.models.user_invitation import UserInvitation
@@ -80,6 +81,7 @@ __all__ = [
     "ProcessingJobLog",
     "ProcessingWorker",
     "ProjectTask",
+    "Recommendation",
     "Report",
     "Role",
     "SeoAnalysis",

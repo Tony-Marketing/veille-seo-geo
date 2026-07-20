@@ -5,6 +5,7 @@ from typing import Any
 
 from core.api_client import ApiClient
 from core.config import APP_NAME, APP_VERSION
+from core.constants import PAGE_RECOMMENDATIONS
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QGridLayout,
@@ -60,6 +61,8 @@ class DashboardPage(QWidget):
 
         self.refresh_button = QPushButton("Rafraichir")
         self.refresh_button.clicked.connect(self.load_overview)
+        self.recommendations_button = QPushButton("Voir toutes les recommandations")
+        self.recommendations_button.clicked.connect(self.open_recommendations)
 
         self.cards: dict[str, QLabel] = {}
         cards_layout = QGridLayout()
@@ -91,6 +94,7 @@ class DashboardPage(QWidget):
         header_layout = QHBoxLayout()
         header_layout.addWidget(title)
         header_layout.addStretch()
+        header_layout.addWidget(self.recommendations_button)
         header_layout.addWidget(self.refresh_button)
 
         meta_layout = QHBoxLayout()
@@ -308,6 +312,11 @@ class DashboardPage(QWidget):
                 "severity": item.get("severity"),
             },
         )
+
+    def open_recommendations(self) -> None:
+        """Open the transverse recommendations page with the current Website context."""
+
+        self.navigation_requested.emit(PAGE_RECOMMENDATIONS, self._website_filters())
 
     def _open_card_target(self, target: str, _event: object) -> None:
         self.navigation_requested.emit(target, self._website_filters())

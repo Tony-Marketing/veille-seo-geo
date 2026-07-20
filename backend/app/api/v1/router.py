@@ -20,6 +20,7 @@ from backend.app.api.v1.routes import (
     orchestration,
     permissions,
     project_tasks,
+    recommendations,
     reports,
     roles,
     seo_analysis,
@@ -44,6 +45,7 @@ api_router.include_router(keywords.router)
 api_router.include_router(urls.router)
 api_router.include_router(reports.router)
 api_router.include_router(project_tasks.router)
+api_router.include_router(recommendations.router)
 api_router.include_router(seo_analysis.router)
 api_router.include_router(geo_analysis.router)
 api_router.include_router(google_analytics.router)

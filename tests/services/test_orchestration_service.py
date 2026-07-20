@@ -11,11 +11,13 @@ from backend.app.repositories.alerts import AlertRepository
 from backend.app.repositories.dashboard_v2 import DashboardV2Repository
 from backend.app.repositories.monitoring import MonitoringRepository
 from backend.app.repositories.orchestration import OrchestrationRepository
+from backend.app.repositories.recommendations import RecommendationRepository
 from backend.app.repositories.sync_schedules import SyncScheduleRepository
 from backend.app.schemas.dashboard_v2 import DashboardV2Filters
 from backend.app.schemas.pagination import PaginationParams
 from backend.app.services.dashboard_v2 import DashboardV2Service
 from backend.app.services.orchestration import OrchestrationService
+from backend.app.services.recommendations import RecommendationService
 
 
 class FakeHandler:
@@ -96,6 +98,7 @@ def test_orchestration_service_worker_executes_and_updates_monitoring(db_session
     alerts, total_alerts = AlertRepository(db_session).list_alerts(PaginationParams())
     dashboard = DashboardV2Service(
         DashboardV2Repository(db_session),
+        RecommendationService(RecommendationRepository(db_session)),
         now_provider=_now,
     ).overview(DashboardV2Filters(website_id=website.id))
 

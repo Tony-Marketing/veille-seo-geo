@@ -6,6 +6,19 @@ Le format est inspiré de **Keep a Changelog**.
 
 ---
 
+## Sprint 37 — Moteur de recommandations SEO/GEO
+
+### Ajout
+
+- moteur transverse de consolidation, déduplication et priorisation des recommandations persistées ;
+- cycle de vie `OPEN`, `ACKNOWLEDGED`, `RESOLVED` et `IGNORED` ;
+- API REST filtrable et paginée avec synthèse et mise à jour du statut ;
+- permissions `recommendation.read` et `recommendation.write` ;
+- page Desktop Recommandations et intégration à la navigation ;
+- alimentation des recommandations du Dashboard V2 par le moteur transverse.
+
+---
+
 # Version 0.1.0 (En développement)
 
 ## Sprint 00 — Initialisation du projet
