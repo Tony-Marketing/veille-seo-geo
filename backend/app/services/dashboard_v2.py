@@ -43,6 +43,12 @@ from backend.app.schemas.dashboard_v2 import (
     DashboardV2WorkerKpis,
 )
 from backend.app.schemas.pagination import PaginationParams
+from backend.app.schemas.recommendations import (
+    RecommendationFilters,
+    RecommendationPriority,
+    RecommendationRead,
+)
+from backend.app.services.recommendations import RecommendationService
 
 SEO_WEIGHT = 0.35
 GEO_WEIGHT = 0.20
@@ -66,15 +72,17 @@ RECOMMENDATION_SORT_FIELDS = {"priority", "severity", "source", "created_at", "w
 
 
 class DashboardV2Service:
-    """Aggregate Dashboard V2 data and apply deterministic business rules."""
+    """Aggregate Dashboard V2 data and consume transverse recommendations."""
 
     def __init__(
         self,
         repository: DashboardV2Repository,
+        recommendation_service: RecommendationService,
         *,
         now_provider: Callable[[], datetime] | None = None,
     ) -> None:
         self.repository = repository
+        self.recommendation_service = recommendation_service
         self.now_provider = now_provider or (lambda: datetime.now(UTC))
 
     def overview(self, filters: DashboardV2Filters | None = None) -> DashboardV2OverviewResponse:
@@ -93,8 +101,7 @@ class DashboardV2Service:
         previous_raw = self._raw_data(websites, previous_period) if previous_period is not None else None
 
         website_summaries = self._website_summaries(websites, raw, filters)
-        recommendations = self._recommendations(raw=raw, websites=websites, filters=filters, page=None)
-        top_recommendations = recommendations[:10]
+        top_recommendations = self._engine_recommendations(websites=websites, filters=filters)[:10]
         global_health = self._global_health(raw, previous_raw)
         partial_data = self._partial_data(raw)
         return DashboardV2OverviewResponse(
@@ -210,19 +217,17 @@ class DashboardV2Service:
         severity: DashboardV2RecommendationSeverity | None = None,
         priority: int | None = None,
     ) -> DashboardV2RecommendationList:
-        """Return paginated deterministic recommendations."""
+        """Return paginated recommendations produced by RecommendationService."""
 
         filters = self._normalize_filters(filters or DashboardV2Filters())
         self._validate_recommendation_sort(params.sort)
-        period = self._resolve_period(filters)
         websites = self.repository.list_all_websites(
             website_id=filters.website_id,
             entity_id=filters.entity_id,
             is_active=filters.is_active,
             search=filters.search,
         )
-        raw = self._raw_data(websites, period)
-        items = self._recommendations(raw=raw, websites=websites, filters=filters, page=None)
+        items = self._engine_recommendations(websites=websites, filters=filters)
         if severity is not None:
             items = [item for item in items if item.severity == severity]
         if priority is not None:
@@ -264,9 +269,6 @@ class DashboardV2Service:
             "operations": self.repository.operations_aggregates(start=start, end=end, now=now),
             "active_alerts_by_website": self.repository.active_alert_counts_by_website(website_ids),
             "jobs_by_website": self.repository.failed_or_blocked_jobs_by_website(website_ids, now=now),
-            "seo_recommendation_rows": self.repository.seo_issue_rows(start=start, end=end),
-            "geo_recommendation_rows": self.repository.geo_recommendation_rows(start=start, end=end),
-            "alert_recommendation_rows": self.repository.active_alert_rows(),
         }
 
     def _empty_raw(self) -> dict[str, Any]:
@@ -283,9 +285,6 @@ class DashboardV2Service:
             "operations": {"workers": []},
             "active_alerts_by_website": {},
             "jobs_by_website": {},
-            "seo_recommendation_rows": [],
-            "geo_recommendation_rows": [],
-            "alert_recommendation_rows": [],
         }
 
     def _website_summaries(
@@ -671,187 +670,88 @@ class DashboardV2Service:
             last_heartbeat_at=self._latest(*(worker.get("last_heartbeat_at") for worker in workers)),
         )
 
-    def _recommendations(
+    def _engine_recommendations(
         self,
         *,
-        raw: dict[str, Any],
         websites: list[Website],
         filters: DashboardV2Filters,
-        page: int | None,
     ) -> list[DashboardV2Recommendation]:
-        website_names = {website.id: website.name for website in websites}
-        items: list[DashboardV2Recommendation] = []
-        enabled_sources = {source.value for source in filters.source} if filters.source else set()
-        if not enabled_sources or DashboardV2Source.SEO.value in enabled_sources:
-            for row in raw["seo_recommendation_rows"]:
-                items.append(
-                    self._recommendation(
-                        type_="seo_critical",
-                        severity=DashboardV2RecommendationSeverity.CRITICAL,
-                        priority=1,
-                        title=f"Corriger l'issue SEO {row['code']}",
-                        message=str(row["message"] or "Issue SEO critique detectee."),
-                        source=DashboardV2Source.SEO,
-                        row=row,
-                        website_names=website_names,
-                        target="SEO Analysis",
-                    ),
-                )
-        if not enabled_sources or DashboardV2Source.GEO.value in enabled_sources:
-            for row in raw["geo_recommendation_rows"]:
-                items.append(
-                    self._recommendation(
-                        type_="geo_priority",
-                        severity=DashboardV2RecommendationSeverity.WARNING,
-                        priority=min(int(row.get("priority") or 2), 5),
-                        title=str(row.get("title") or "Recommandation GEO prioritaire"),
-                        message=str(row.get("message") or "Recommandation GEO prioritaire."),
-                        source=DashboardV2Source.GEO,
-                        row=row,
-                        website_names=website_names,
-                        target="GEO Analysis",
-                    ),
-                )
-        if not enabled_sources or DashboardV2Source.ALERTS.value in enabled_sources:
-            for row in raw["alert_recommendation_rows"]:
-                severity = DashboardV2RecommendationSeverity.CRITICAL
-                if row.get("severity") == "Warning":
-                    severity = DashboardV2RecommendationSeverity.WARNING
-                elif row.get("severity") == "Info":
-                    severity = DashboardV2RecommendationSeverity.INFO
-                items.append(
-                    self._recommendation(
-                        type_="active_alert",
-                        severity=severity,
-                        priority=1 if severity == DashboardV2RecommendationSeverity.CRITICAL else 2,
-                        title=str(row.get("title") or "Alerte active"),
-                        message=str(row.get("message") or "Alerte active a traiter."),
-                        source=DashboardV2Source.ALERTS,
-                        row=row,
-                        website_names=website_names,
-                        target="Alertes",
-                    ),
-                )
-        self._add_kpi_recommendations(items, raw=raw, websites=websites, filters=filters)
-        if page is not None:
-            return items[:page]
-        return items
+        """Load RecommendationService results and adapt the historical Dashboard contract."""
 
-    def _add_kpi_recommendations(
-        self,
-        items: list[DashboardV2Recommendation],
-        *,
-        raw: dict[str, Any],
-        websites: list[Website],
-        filters: DashboardV2Filters,
-    ) -> None:
-        website_names = {website.id: website.name for website in websites}
-        enabled_sources = {source.value for source in filters.source} if filters.source else set()
-        for website in websites:
-            website_id = website.id
-            if not enabled_sources or DashboardV2Source.GSC.value in enabled_sources:
-                gsc = raw["gsc"].get(website_id, {})
-                impressions = int(gsc.get("impressions") or 0)
-                clicks = int(gsc.get("clicks") or 0)
-                if impressions > 0 and clicks / impressions < 0.02:
-                    items.append(
-                        self._basic_recommendation(
-                            website_id=website_id,
-                            website_names=website_names,
-                            source=DashboardV2Source.GSC,
-                            type_="gsc_low_ctr",
-                            title="Ameliorer le CTR Google Search Console",
-                            message="Les impressions existent mais le CTR est inferieur a 2 %.",
-                            target="Google Search Console",
-                            priority=2,
-                        ),
-                    )
-            if not enabled_sources or DashboardV2Source.GA4.value in enabled_sources:
-                ga4 = raw["ga4"].get(website_id, {})
-                sessions = int(ga4.get("sessions") or 0)
-                engagement = (
-                    self._safe_ratio(float(ga4.get("engagement_weight") or 0.0), sessions) if sessions else None
-                )
-                if engagement is not None and engagement < 0.3:
-                    items.append(
-                        self._basic_recommendation(
-                            website_id=website_id,
-                            website_names=website_names,
-                            source=DashboardV2Source.GA4,
-                            type_="ga4_low_engagement",
-                            title="Surveiller l'engagement GA4",
-                            message="Le taux d'engagement GA4 est inferieur a 0.3.",
-                            target="Google Analytics 4",
-                            priority=3,
-                        ),
-                    )
-            if not enabled_sources or DashboardV2Source.BING.value in enabled_sources:
-                bing = raw["bing"].get(website_id, {})
-                if int(bing.get("crawl_errors") or 0) > 0:
-                    items.append(
-                        self._basic_recommendation(
-                            website_id=website_id,
-                            website_names=website_names,
-                            source=DashboardV2Source.BING,
-                            type_="bing_crawl_errors",
-                            title="Corriger les erreurs de crawl Bing",
-                            message="Bing Webmaster Tools signale des erreurs de crawl.",
-                            target="Bing Webmaster Tools",
-                            priority=2,
-                        ),
-                    )
-
-    def _recommendation(
-        self,
-        *,
-        type_: str,
-        severity: DashboardV2RecommendationSeverity,
-        priority: int,
-        title: str,
-        message: str,
-        source: DashboardV2Source,
-        row: dict[str, Any],
-        website_names: dict[int, str],
-        target: str,
-    ) -> DashboardV2Recommendation:
-        website_id = row.get("website_id") if isinstance(row.get("website_id"), int) else None
-        return DashboardV2Recommendation(
-            type=type_,
-            severity=severity,
-            priority=priority,
-            title=title,
-            message=message,
-            source=source,
-            website_id=website_id,
-            source_id=str(row.get("source_id")) if row.get("source_id") is not None else None,
-            navigation_target=target,
-            created_at=row.get("created_at") if isinstance(row.get("created_at"), datetime) else None,
-            website_name=website_names.get(website_id) if website_id is not None else None,
+        restrict_websites = any(
+            value is not None
+            for value in (filters.website_id, filters.entity_id, filters.is_active, filters.search)
         )
+        website_ids = [website.id for website in websites] if restrict_websites else None
+        engine_items: list[RecommendationRead] = []
+        page = 1
+        while True:
+            result = self.recommendation_service.list_recommendations(
+                PaginationParams(page=page, page_size=100),
+                filters=RecommendationFilters(),
+                website_ids=website_ids,
+                synchronize=page == 1,
+            )
+            engine_items.extend(result.items)
+            if page >= result.pages:
+                break
+            page += 1
 
-    def _basic_recommendation(
-        self,
-        *,
-        website_id: int,
-        website_names: dict[int, str],
-        source: DashboardV2Source,
-        type_: str,
-        title: str,
-        message: str,
-        target: str,
-        priority: int,
-    ) -> DashboardV2Recommendation:
+        enabled_sources = {source.value for source in filters.source}
+        items = [
+            self._dashboard_recommendation(item)
+            for item in engine_items
+            if item.status.value in {"OPEN", "ACKNOWLEDGED"}
+        ]
+        if enabled_sources:
+            items = [item for item in items if item.source.value in enabled_sources]
+        return self._sort_recommendations(items, None, "asc")
+
+    def _dashboard_recommendation(self, item: RecommendationRead) -> DashboardV2Recommendation:
+        source_map = {
+            "SEO": (DashboardV2Source.SEO, "SEO Analysis"),
+            "GEO": (DashboardV2Source.GEO, "GEO Analysis"),
+            "MONITORING": (DashboardV2Source.MONITORING, "Monitoring"),
+            "ALERTS": (DashboardV2Source.ALERTS, "Alertes"),
+            "GSC": (DashboardV2Source.GSC, "Google Search Console"),
+            "GA4": (DashboardV2Source.GA4, "Google Analytics 4"),
+            "BING": (DashboardV2Source.BING, "Bing Webmaster Tools"),
+        }
+        priority_map = {
+            RecommendationPriority.CRITICAL: 1,
+            RecommendationPriority.HIGH: 2,
+            RecommendationPriority.MEDIUM: 3,
+            RecommendationPriority.LOW: 4,
+        }
+        severity_map = {
+            RecommendationPriority.CRITICAL: DashboardV2RecommendationSeverity.CRITICAL,
+            RecommendationPriority.HIGH: DashboardV2RecommendationSeverity.WARNING,
+            RecommendationPriority.MEDIUM: DashboardV2RecommendationSeverity.INFO,
+            RecommendationPriority.LOW: DashboardV2RecommendationSeverity.INFO,
+        }
+        source, target = source_map[item.source.value]
+        metadata = item.metadata or {}
+        rule_code = str(metadata.get("rule_code") or item.category)
+        type_map = {
+            "SEO": "seo_critical",
+            "GEO": "geo_priority",
+            "ALERTS": "active_alert",
+            "GSC": "gsc_low_ctr",
+            "GA4": "ga4_low_engagement",
+            "BING": "bing_crawl_errors" if rule_code == "bing_crawl_error" else rule_code,
+        }
         return DashboardV2Recommendation(
-            type=type_,
-            severity=DashboardV2RecommendationSeverity.WARNING,
-            priority=priority,
-            title=title,
-            message=message,
+            type=type_map.get(item.source.value, rule_code),
+            severity=severity_map[item.priority],
+            priority=priority_map[item.priority],
+            title=item.title,
+            message=item.description,
             source=source,
-            website_id=website_id,
+            website_id=item.website_id,
+            source_id=item.source_id,
             navigation_target=target,
-            created_at=self._now(),
-            website_name=website_names.get(website_id),
+            created_at=item.created_at,
+            website_name=item.website_name,
         )
 
     def _sources(self, raw: dict[str, Any]) -> list[DashboardV2SourceAvailability]:

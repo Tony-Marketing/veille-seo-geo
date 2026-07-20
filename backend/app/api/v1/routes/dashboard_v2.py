@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from backend.app.core.database import get_db
 from backend.app.core.security import require_permission
 from backend.app.repositories.dashboard_v2 import DashboardV2Repository
+from backend.app.repositories.recommendations import RecommendationRepository
 from backend.app.schemas.dashboard_v2 import (
     DashboardV2Filters,
     DashboardV2Granularity,
@@ -24,6 +25,7 @@ from backend.app.schemas.dashboard_v2 import (
 )
 from backend.app.schemas.pagination import Order, PaginationParams, pagination_params
 from backend.app.services.dashboard_v2 import DashboardV2Service
+from backend.app.services.recommendations import RecommendationService
 
 router = APIRouter(prefix="/dashboard-v2", tags=["Dashboard V2"])
 
@@ -31,7 +33,10 @@ router = APIRouter(prefix="/dashboard-v2", tags=["Dashboard V2"])
 def get_service(db: Session = Depends(get_db)) -> DashboardV2Service:
     """Build the Dashboard V2 service from the request database session."""
 
-    return DashboardV2Service(DashboardV2Repository(db))
+    return DashboardV2Service(
+        DashboardV2Repository(db),
+        RecommendationService(RecommendationRepository(db)),
+    )
 
 
 def dashboard_v2_filters(
@@ -122,7 +127,7 @@ def list_dashboard_v2_websites(
     response_model=DashboardV2RecommendationList,
     dependencies=[Depends(require_permission("crawl.read"))],
     summary="Recommandations Dashboard V2",
-    description="Retourne les recommandations deterministes non persistees du Dashboard V2.",
+    description="Retourne les recommandations persistees produites par le moteur transverse.",
 )
 def list_dashboard_v2_recommendations(
     params: PaginationParams = Depends(pagination_params),

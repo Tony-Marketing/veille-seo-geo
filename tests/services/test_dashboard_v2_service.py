@@ -8,13 +8,16 @@ from sqlalchemy.orm import Session
 
 from backend.app.models import Alert, CrawlPage, CrawlSession, SeoAnalysis, SeoAnalysisIssue, SeoPageAnalysis, Website
 from backend.app.repositories.dashboard_v2 import DashboardV2Repository
+from backend.app.repositories.recommendations import RecommendationRepository
 from backend.app.schemas.dashboard_v2 import DashboardV2Filters, DashboardV2Period
 from backend.app.services.dashboard_v2 import DashboardV2Service
+from backend.app.services.recommendations import RecommendationService
 
 
 def _service(db_session: Session) -> DashboardV2Service:
     return DashboardV2Service(
         DashboardV2Repository(db_session),
+        RecommendationService(RecommendationRepository(db_session)),
         now_provider=lambda: datetime(2026, 7, 10, tzinfo=UTC),
     )
 

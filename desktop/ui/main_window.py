@@ -20,6 +20,7 @@ from core.constants import (
     PAGE_MONITORING,
     PAGE_ORCHESTRATION,
     PAGE_PROJECT_TASKS,
+    PAGE_RECOMMENDATIONS,
     PAGE_REPORTS,
     PAGE_SEO_ANALYSIS,
     PAGE_SYNC_SCHEDULES,
@@ -45,6 +46,7 @@ from ui.login_dialog import LoginDialog
 from ui.monitoring_page import MonitoringPage
 from ui.orchestration_page import OrchestrationPage
 from ui.project_tasks_page import ProjectTasksPage
+from ui.recommendations_page import RecommendationsPage
 from ui.reports_page import ReportsPage
 from ui.seo_analysis_page import SeoAnalysisPage
 from ui.sync_schedules_page import SyncSchedulesPage
@@ -155,6 +157,7 @@ class MainWindow(QMainWindow):
             PAGE_SYNC_SCHEDULES: lambda: SyncSchedulesPage(self.api_client),
             PAGE_MONITORING: lambda: MonitoringPage(self.api_client),
             PAGE_ALERTS: lambda: AlertsPage(self.api_client),
+            PAGE_RECOMMENDATIONS: lambda: RecommendationsPage(self.api_client),
             PAGE_ORCHESTRATION: lambda: OrchestrationPage(self.api_client),
             PAGE_PROJECT_TASKS: lambda: ProjectTasksPage(self.api_client),
             PAGE_REPORTS: lambda: ReportsPage(self.api_client),
@@ -250,6 +253,7 @@ class MainWindow(QMainWindow):
             PAGE_DASHBOARD: "load_overview",
             PAGE_MONITORING: "load_data",
             PAGE_ALERTS: "load_data",
+            PAGE_RECOMMENDATIONS: "load_data",
         }
         for page_name, method_name in refresh_methods.items():
             page = self.pages.get(page_name)
@@ -294,6 +298,7 @@ class MainWindow(QMainWindow):
             PAGE_SYNC_SCHEDULES: "load_data",
             PAGE_MONITORING: "load_data",
             PAGE_ALERTS: "load_data",
+            PAGE_RECOMMENDATIONS: "load_data",
         }
         method_name = refresh_methods.get(page_name)
         method = getattr(page, method_name, None) if method_name is not None else None
