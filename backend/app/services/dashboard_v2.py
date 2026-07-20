@@ -17,6 +17,7 @@ from backend.app.schemas.dashboard_v2 import (
     DashboardV2BingKpis,
     DashboardV2Filters,
     DashboardV2Ga4Kpis,
+    DashboardV2GeoIntelligenceKpis,
     DashboardV2GeoKpis,
     DashboardV2Granularity,
     DashboardV2GscKpis,
@@ -42,12 +43,14 @@ from backend.app.schemas.dashboard_v2 import (
     DashboardV2WebsiteSummary,
     DashboardV2WorkerKpis,
 )
+from backend.app.schemas.geo_intelligence import GeoVisibilityFilters
 from backend.app.schemas.pagination import PaginationParams
 from backend.app.schemas.recommendations import (
     RecommendationFilters,
     RecommendationPriority,
     RecommendationRead,
 )
+from backend.app.services.geo_intelligence import GeoIntelligenceService
 from backend.app.services.recommendations import RecommendationService
 
 SEO_WEIGHT = 0.35
@@ -78,11 +81,13 @@ class DashboardV2Service:
         self,
         repository: DashboardV2Repository,
         recommendation_service: RecommendationService,
+        geo_intelligence_service: GeoIntelligenceService | None = None,
         *,
         now_provider: Callable[[], datetime] | None = None,
     ) -> None:
         self.repository = repository
         self.recommendation_service = recommendation_service
+        self.geo_intelligence_service = geo_intelligence_service
         self.now_provider = now_provider or (lambda: datetime.now(UTC))
 
     def overview(self, filters: DashboardV2Filters | None = None) -> DashboardV2OverviewResponse:
@@ -98,6 +103,8 @@ class DashboardV2Service:
             search=filters.search,
         )
         raw = self._raw_data(websites, period)
+        geo_intelligence = self._geo_intelligence_summary(websites, period)
+        raw["geo_intelligence"] = geo_intelligence.model_dump()
         previous_raw = self._raw_data(websites, previous_period) if previous_period is not None else None
 
         website_summaries = self._website_summaries(websites, raw, filters)
@@ -113,6 +120,7 @@ class DashboardV2Service:
             global_health=global_health,
             seo=self._seo_kpis(self._sum_dicts(raw["seo"].values())),
             geo=self._geo_kpis(self._sum_dicts(raw["geo"].values())),
+            geo_intelligence=geo_intelligence,
             gsc=self._gsc_kpis(self._sum_dicts(raw["gsc"].values())),
             ga4=self._ga4_kpis(self._sum_dicts(raw["ga4"].values())),
             bing=self._bing_kpis(self._sum_dicts(raw["bing"].values())),
@@ -147,6 +155,7 @@ class DashboardV2Service:
         selected_metrics = metrics or [
             DashboardV2TrendMetric.SEO_SCORE,
             DashboardV2TrendMetric.GEO_SCORE,
+            DashboardV2TrendMetric.GEO_VISIBILITY_SCORE,
             DashboardV2TrendMetric.GSC_CLICKS,
             DashboardV2TrendMetric.GA4_SESSIONS,
             DashboardV2TrendMetric.BING_CLICKS,
@@ -155,6 +164,9 @@ class DashboardV2Service:
         end = self._datetime_end(period.date_to)
         series = []
         for metric in selected_metrics:
+            if metric == DashboardV2TrendMetric.GEO_VISIBILITY_SCORE:
+                series.extend(self._geo_intelligence_trends(websites, period, granularity))
+                continue
             rows = self.repository.trend_rows(
                 metric.value,
                 start=start,
@@ -716,6 +728,7 @@ class DashboardV2Service:
             "GSC": (DashboardV2Source.GSC, "Google Search Console"),
             "GA4": (DashboardV2Source.GA4, "Google Analytics 4"),
             "BING": (DashboardV2Source.BING, "Bing Webmaster Tools"),
+            "GEO_INTELLIGENCE": (DashboardV2Source.GEO_INTELLIGENCE, "GEO Intelligence"),
         }
         priority_map = {
             RecommendationPriority.CRITICAL: 1,
@@ -739,6 +752,7 @@ class DashboardV2Service:
             "GSC": "gsc_low_ctr",
             "GA4": "ga4_low_engagement",
             "BING": "bing_crawl_errors" if rule_code == "bing_crawl_error" else rule_code,
+            "GEO_INTELLIGENCE": rule_code,
         }
         return DashboardV2Recommendation(
             type=type_map.get(item.source.value, rule_code),
@@ -754,10 +768,66 @@ class DashboardV2Service:
             website_name=item.website_name,
         )
 
+    def _geo_intelligence_summary(
+        self,
+        websites: list[Website],
+        period: DashboardV2ResolvedPeriod,
+    ) -> DashboardV2GeoIntelligenceKpis:
+        if self.geo_intelligence_service is None:
+            return DashboardV2GeoIntelligenceKpis()
+        summary = self.geo_intelligence_service.summary(
+            filters=GeoVisibilityFilters(
+                date_from=self._datetime_start(period.date_from),
+                date_to=self._datetime_end(period.date_to),
+            ),
+            website_ids=[website.id for website in websites],
+        )
+        return DashboardV2GeoIntelligenceKpis(
+            captures=summary.captures,
+            average_visibility_score=summary.average_visibility_score,
+            providers_covered=summary.providers_covered,
+            citation_count=summary.citation_count,
+            source_count=summary.source_count,
+            appearance_frequency=summary.appearance_frequency,
+            latest_capture_at=summary.latest_capture_at,
+        )
+
+    def _geo_intelligence_trends(
+        self,
+        websites: list[Website],
+        period: DashboardV2ResolvedPeriod,
+        granularity: DashboardV2Granularity,
+    ) -> list[DashboardV2TrendSeries]:
+        if self.geo_intelligence_service is None:
+            return []
+        history = self.geo_intelligence_service.history(
+            filters=GeoVisibilityFilters(
+                date_from=self._datetime_start(period.date_from),
+                date_to=self._datetime_end(period.date_to),
+            ),
+            website_ids=[website.id for website in websites],
+            granularity=granularity.value,
+        )
+        providers = sorted({point.provider for point in history.points})
+        return [
+            DashboardV2TrendSeries(
+                metric=DashboardV2TrendMetric.GEO_VISIBILITY_SCORE,
+                label=f"Visibilite GEO - {provider}",
+                source=DashboardV2Source.GEO_INTELLIGENCE,
+                points=[
+                    DashboardV2TrendPoint(date=point.date, value=point.average_visibility_score)
+                    for point in history.points
+                    if point.provider == provider
+                ],
+            )
+            for provider in providers
+        ]
+
     def _sources(self, raw: dict[str, Any]) -> list[DashboardV2SourceAvailability]:
         source_map = {
             DashboardV2Source.SEO: raw["seo"],
             DashboardV2Source.GEO: raw["geo"],
+            DashboardV2Source.GEO_INTELLIGENCE: raw.get("geo_intelligence", {}),
             DashboardV2Source.GSC: raw["gsc"],
             DashboardV2Source.GA4: raw["ga4"],
             DashboardV2Source.BING: raw["bing"],
@@ -897,6 +967,8 @@ class DashboardV2Service:
     def _metric_source(self, metric: DashboardV2TrendMetric) -> DashboardV2Source:
         if metric.value.startswith("seo"):
             return DashboardV2Source.SEO
+        if metric == DashboardV2TrendMetric.GEO_VISIBILITY_SCORE:
+            return DashboardV2Source.GEO_INTELLIGENCE
         if metric.value.startswith("geo"):
             return DashboardV2Source.GEO
         if metric.value.startswith("gsc"):

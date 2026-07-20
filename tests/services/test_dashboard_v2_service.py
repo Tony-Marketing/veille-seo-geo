@@ -6,18 +6,31 @@ import pytest
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from backend.app.models import Alert, CrawlPage, CrawlSession, SeoAnalysis, SeoAnalysisIssue, SeoPageAnalysis, Website
+from backend.app.models import (
+    Alert,
+    CrawlPage,
+    CrawlSession,
+    GeoVisibilitySnapshot,
+    SeoAnalysis,
+    SeoAnalysisIssue,
+    SeoPageAnalysis,
+    Website,
+)
 from backend.app.repositories.dashboard_v2 import DashboardV2Repository
+from backend.app.repositories.geo_intelligence import GeoIntelligenceRepository
 from backend.app.repositories.recommendations import RecommendationRepository
 from backend.app.schemas.dashboard_v2 import DashboardV2Filters, DashboardV2Period
 from backend.app.services.dashboard_v2 import DashboardV2Service
+from backend.app.services.geo_intelligence import GeoIntelligenceService
 from backend.app.services.recommendations import RecommendationService
 
 
 def _service(db_session: Session) -> DashboardV2Service:
+    geo_service = GeoIntelligenceService(GeoIntelligenceRepository(db_session))
     return DashboardV2Service(
         DashboardV2Repository(db_session),
-        RecommendationService(RecommendationRepository(db_session)),
+        RecommendationService(RecommendationRepository(db_session), geo_service),
+        geo_service,
         now_provider=lambda: datetime(2026, 7, 10, tzinfo=UTC),
     )
 
@@ -130,3 +143,30 @@ def test_dashboard_v2_service_requires_custom_dates(db_session: Session) -> None
         _service(db_session).overview(DashboardV2Filters(period=DashboardV2Period.CUSTOM))
 
     assert exc_info.value.status_code == 422
+
+
+def test_dashboard_v2_consumes_geo_intelligence_summary_and_history(db_session: Session) -> None:
+    website = _website(db_session)
+    db_session.add(
+        GeoVisibilitySnapshot(
+            website_id=website.id,
+            provider="chatgpt",
+            prompt="Prompt",
+            entity="Marque",
+            visibility_score=40,
+            citation_count=2,
+            source_count=2,
+            answer_hash="d" * 64,
+            captured_at=datetime(2026, 7, 10, 10, tzinfo=UTC),
+        ),
+    )
+    db_session.commit()
+
+    service = _service(db_session)
+    overview = service.overview(DashboardV2Filters(website_id=website.id))
+    trends = service.trends(filters=DashboardV2Filters(website_id=website.id))
+
+    assert overview.geo_intelligence.captures == 1
+    assert overview.geo_intelligence.average_visibility_score == 40
+    assert any(source.source.value == "geo_intelligence" and source.available for source in overview.sources)
+    assert any(series.metric.value == "geo_visibility_score" for series in trends.series)

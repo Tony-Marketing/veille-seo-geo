@@ -27,6 +27,7 @@ def _overview_payload() -> dict[str, object]:
         },
         "seo": {},
         "geo": {},
+        "geo_intelligence": {},
         "gsc": {},
         "ga4": {},
         "bing": {},

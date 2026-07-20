@@ -22,6 +22,7 @@ from backend.app.schemas.recommendations import (
     RecommendationStatus,
     RecommendationSummary,
 )
+from backend.app.services.geo_intelligence import GeoIntelligenceService
 
 
 @dataclass(frozen=True)
@@ -61,8 +62,13 @@ class RecommendationService:
         RecommendationStatus.IGNORED: {RecommendationStatus.OPEN},
     }
 
-    def __init__(self, repository: RecommendationRepository) -> None:
+    def __init__(
+        self,
+        repository: RecommendationRepository,
+        geo_intelligence_service: GeoIntelligenceService | None = None,
+    ) -> None:
         self.repository = repository
+        self.geo_intelligence_service = geo_intelligence_service
 
     def list_recommendations(
         self,
@@ -203,7 +209,47 @@ class RecommendationService:
             *self._gsc_candidates(),
             *self._ga4_candidates(),
             *self._bing_candidates(),
+            *self._geo_intelligence_candidates(),
         ]
+
+    def _geo_intelligence_candidates(self) -> list[RecommendationCandidate]:
+        if self.geo_intelligence_service is None:
+            return []
+        priority_map = {
+            "low_visibility": (RecommendationPriority.HIGH, 75.0),
+            "significant_decrease": (RecommendationPriority.HIGH, 85.0),
+            "citation_loss": (RecommendationPriority.HIGH, 80.0),
+            "insufficient_source_diversity": (RecommendationPriority.MEDIUM, 55.0),
+            "provider_absence": (RecommendationPriority.HIGH, 90.0),
+        }
+        candidates = []
+        for signal in self.geo_intelligence_service.recommendation_signals():
+            priority, score = priority_map[signal.rule_code]
+            candidates.append(
+                RecommendationCandidate(
+                    website_id=signal.website_id,
+                    source=RecommendationSource.GEO_INTELLIGENCE,
+                    rule_code=signal.rule_code,
+                    source_object_type="geo_visibility_scope",
+                    source_object_id=signal.source_object_id,
+                    category="geo_intelligence",
+                    title=signal.title,
+                    description=signal.description,
+                    priority=priority,
+                    impact=RecommendationImpact.GEO,
+                    score=score,
+                    metadata={
+                        "rule_code": signal.rule_code,
+                        "source_object_type": "geo_visibility_scope",
+                        "source_object_id": signal.source_object_id,
+                        "provider": signal.provider,
+                        "prompt": signal.prompt,
+                        "entity": signal.entity,
+                        "ranking_factors": signal.factors,
+                    },
+                ),
+            )
+        return candidates
 
     def _seo_candidates(self) -> list[RecommendationCandidate]:
         candidates = []

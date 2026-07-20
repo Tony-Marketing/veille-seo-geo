@@ -20,6 +20,7 @@ class RecommendationSource(StrEnum):
     GSC = "GSC"
     GA4 = "GA4"
     BING = "BING"
+    GEO_INTELLIGENCE = "GEO_INTELLIGENCE"
 
 
 class RecommendationPriority(StrEnum):

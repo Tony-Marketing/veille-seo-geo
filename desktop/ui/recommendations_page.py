@@ -71,7 +71,9 @@ class RecommendationsPage(QWidget):
             self.cards[key] = card.findChild(QLabel, "CardValue") or QLabel("-")
             cards_layout.addWidget(card, index // 3, index % 3)
 
-        self.source_filter = self._combo(["", "SEO", "GEO", "MONITORING", "ALERTS", "GSC", "GA4", "BING"])
+        self.source_filter = self._combo(
+            ["", "SEO", "GEO", "GEO_INTELLIGENCE", "MONITORING", "ALERTS", "GSC", "GA4", "BING"],
+        )
         self.priority_filter = self._combo(["", "CRITICAL", "HIGH", "MEDIUM", "LOW"])
         self.status_filter = self._combo(["", "OPEN", "ACKNOWLEDGED", "RESOLVED", "IGNORED"])
         self.category_filter = QLineEdit()

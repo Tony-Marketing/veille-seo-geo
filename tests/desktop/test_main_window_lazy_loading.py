@@ -9,6 +9,7 @@ from core.constants import (
     PAGE_BING_WEBMASTER_TOOLS,
     PAGE_DASHBOARD,
     PAGE_GEO_ANALYSIS,
+    PAGE_GEO_INTELLIGENCE,
     PAGE_GOOGLE_SEARCH_CONSOLE,
     PAGE_MONITORING,
     PAGE_ORCHESTRATION,
@@ -83,6 +84,7 @@ def page_creation_log(monkeypatch: pytest.MonkeyPatch, qt_app: QApplication) -> 
     monkeypatch.setattr(main_window_module, "SeoAnalysisPage", fake_page_class(PAGE_SEO_ANALYSIS))
     monkeypatch.setattr(main_window_module, "GSCPage", fake_page_class(PAGE_GOOGLE_SEARCH_CONSOLE))
     monkeypatch.setattr(main_window_module, "GeoAnalysisPage", fake_page_class(PAGE_GEO_ANALYSIS))
+    monkeypatch.setattr(main_window_module, "GeoIntelligencePage", fake_page_class(PAGE_GEO_INTELLIGENCE))
     monkeypatch.setattr(main_window_module, "BingWebmasterToolsPage", fake_page_class(PAGE_BING_WEBMASTER_TOOLS))
     monkeypatch.setattr(main_window_module, "SyncSchedulesPage", fake_page_class(PAGE_SYNC_SCHEDULES))
     monkeypatch.setattr(main_window_module, "MonitoringPage", fake_page_class(PAGE_MONITORING))

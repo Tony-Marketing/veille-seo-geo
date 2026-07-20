@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from backend.app.core.database import get_db
 from backend.app.core.security import require_permission
 from backend.app.models import User
+from backend.app.repositories.geo_intelligence import GeoIntelligenceRepository
 from backend.app.repositories.recommendations import RecommendationRepository
 from backend.app.schemas.pagination import PaginationParams, pagination_params
 from backend.app.schemas.recommendations import (
@@ -20,6 +21,7 @@ from backend.app.schemas.recommendations import (
     RecommendationStatusUpdate,
     RecommendationSummary,
 )
+from backend.app.services.geo_intelligence import GeoIntelligenceService
 from backend.app.services.recommendations import RecommendationService
 
 router = APIRouter(prefix="/recommendations", tags=["Recommendations"])
@@ -28,7 +30,10 @@ router = APIRouter(prefix="/recommendations", tags=["Recommendations"])
 def get_service(db: Session = Depends(get_db)) -> RecommendationService:
     """Build the recommendation service for one request."""
 
-    return RecommendationService(RecommendationRepository(db))
+    return RecommendationService(
+        RecommendationRepository(db),
+        GeoIntelligenceService(GeoIntelligenceRepository(db)),
+    )
 
 
 def recommendation_filters(

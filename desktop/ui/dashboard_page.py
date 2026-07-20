@@ -5,7 +5,7 @@ from typing import Any
 
 from core.api_client import ApiClient
 from core.config import APP_NAME, APP_VERSION
-from core.constants import PAGE_RECOMMENDATIONS
+from core.constants import PAGE_GEO_INTELLIGENCE, PAGE_RECOMMENDATIONS
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QGridLayout,
@@ -72,6 +72,7 @@ class DashboardPage(QWidget):
                 ("health_score", "Sante globale", "Websites"),
                 ("seo_score", "SEO", "SEO Analysis"),
                 ("geo_score", "GEO", "GEO Analysis"),
+                ("geo_visibility_score", "Visibilite IA", PAGE_GEO_INTELLIGENCE),
                 ("gsc_clicks", "Clics GSC", "Google Search Console"),
                 ("ga4_sessions", "Sessions GA4", "Google Analytics 4"),
                 ("bing_clicks", "Clics Bing", "Bing Webmaster Tools"),
@@ -157,6 +158,7 @@ class DashboardPage(QWidget):
     def _populate(self, payload: dict[str, Any]) -> None:
         seo = self._dict(payload.get("seo"))
         geo = self._dict(payload.get("geo"))
+        geo_intelligence = self._dict(payload.get("geo_intelligence"))
         gsc = self._dict(payload.get("gsc"))
         ga4 = self._dict(payload.get("ga4"))
         bing = self._dict(payload.get("bing"))
@@ -167,6 +169,7 @@ class DashboardPage(QWidget):
         self.cards["health_score"].setText(self._score(health.get("score")))
         self.cards["seo_score"].setText(self._score(seo.get("average_score") or seo.get("global_score")))
         self.cards["geo_score"].setText(self._score(geo.get("geo_score") or geo.get("global_score")))
+        self.cards["geo_visibility_score"].setText(self._score(geo_intelligence.get("average_visibility_score")))
         self.cards["gsc_clicks"].setText(str(gsc.get("clicks") or 0))
         self.cards["ga4_sessions"].setText(str(ga4.get("sessions") or 0))
         self.cards["bing_clicks"].setText(str(bing.get("clicks") or 0))

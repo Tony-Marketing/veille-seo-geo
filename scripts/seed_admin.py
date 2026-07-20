@@ -26,6 +26,8 @@ PERMISSIONS = [
     ("report.delete", "Supprimer les rapports", "report"),
     ("recommendation.read", "Lire les recommandations", "recommendation"),
     ("recommendation.write", "Modifier les recommandations", "recommendation"),
+    ("geo.read", "Lire GEO Intelligence", "geo"),
+    ("geo.write", "Importer des observations GEO Intelligence", "geo"),
     ("project_task.read", "Lire les taches projet", "project_task"),
     ("project_task.write", "Modifier les taches projet", "project_task"),
     ("project_task.delete", "Supprimer les taches projet", "project_task"),
@@ -42,7 +44,17 @@ PERMISSIONS = [
     ("logs.read", "Lire les journaux", "logs"),
 ]
 
-BUSINESS_MODULES = {"website", "entity", "keyword", "competitor", "url", "report", "project_task", "recommendation"}
+BUSINESS_MODULES = {
+    "website",
+    "entity",
+    "keyword",
+    "competitor",
+    "url",
+    "report",
+    "project_task",
+    "recommendation",
+    "geo",
+}
 ADMIN_BUSINESS_PERMISSION_CODES = {code for code, _label, module in PERMISSIONS if module in BUSINESS_MODULES}
 
 ROLES = [

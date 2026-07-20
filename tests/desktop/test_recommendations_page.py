@@ -76,6 +76,7 @@ def test_recommendations_page_loads_filters_paginates_and_updates(qt_app: QAppli
 
         assert any(method == "PATCH" for method, _path in seen)
         assert page.page_label.text() == "Page 1/1"
+        assert page.source_filter.findText("GEO_INTELLIGENCE") >= 0
     finally:
         page.close()
 

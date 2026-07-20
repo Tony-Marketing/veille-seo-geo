@@ -22,6 +22,7 @@ from backend.app.models.bing_webmaster_tools import (
 from backend.app.models.crawls import CrawlPage, CrawlSession
 from backend.app.models.entities import Competitor, Entity, Keyword, ProjectTask, Report, Url, Website
 from backend.app.models.geo_analysis import GeoAnalysis, GeoProviderResult, GeoRecommendation
+from backend.app.models.geo_intelligence import GeoVisibilitySnapshot
 from backend.app.models.google_analytics import (
     GoogleAnalyticsDimension,
     GoogleAnalyticsImport,
@@ -65,6 +66,7 @@ __all__ = [
     "GeoAnalysis",
     "GeoProviderResult",
     "GeoRecommendation",
+    "GeoVisibilitySnapshot",
     "GoogleAnalyticsDimension",
     "GoogleAnalyticsImport",
     "GoogleAnalyticsMetric",
