@@ -3,7 +3,7 @@
 from typing import Any
 
 from core.api_client import ApiClient
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QDialog,
     QHBoxLayout,
@@ -24,6 +24,9 @@ class WebsitesPage(QWidget):
     """Affiche et gere les sites recuperes depuis l'API REST."""
 
     COLUMNS = ["Nom", "URL", "Actif", "Entité"]
+    website_selected = Signal(object)
+    navigation_requested = Signal(str, object)
+    data_changed = Signal()
 
     def __init__(self, api_client: ApiClient) -> None:
         """Create the websites page and load the initial data."""
@@ -41,6 +44,10 @@ class WebsitesPage(QWidget):
         self.edit_button = QPushButton("Modifier")
         self.edit_button.clicked.connect(self.edit_website)
         self.edit_button.setEnabled(False)
+
+        self.use_button = QPushButton("Utiliser et ouvrir Keywords")
+        self.use_button.clicked.connect(self.open_keywords)
+        self.use_button.setEnabled(False)
 
         self.delete_button = QPushButton("Supprimer")
         self.delete_button.clicked.connect(self.delete_website)
@@ -61,13 +68,14 @@ class WebsitesPage(QWidget):
         self.table.setAlternatingRowColors(True)
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.table.itemSelectionChanged.connect(self._update_row_actions)
+        self.table.itemSelectionChanged.connect(self._on_selection_changed)
         self.table.itemDoubleClicked.connect(lambda _item: self.edit_website())
 
         header_layout = QHBoxLayout()
         header_layout.addWidget(title)
         header_layout.addStretch()
         header_layout.addWidget(self.create_button)
+        header_layout.addWidget(self.use_button)
         header_layout.addWidget(self.edit_button)
         header_layout.addWidget(self.delete_button)
         header_layout.addWidget(self.refresh_button)
@@ -124,6 +132,7 @@ class WebsitesPage(QWidget):
         else:
             self.load_websites()
             self.message.setText("Site ajoute.")
+            self.data_changed.emit()
         finally:
             self._set_busy(False)
 
@@ -152,6 +161,7 @@ class WebsitesPage(QWidget):
         else:
             self.load_websites()
             self.message.setText("Site modifie.")
+            self.data_changed.emit()
         finally:
             self._set_busy(False)
 
@@ -187,6 +197,7 @@ class WebsitesPage(QWidget):
         else:
             self.load_websites()
             self.message.setText("Site supprime.")
+            self.data_changed.emit()
         finally:
             self._set_busy(False)
 
@@ -225,6 +236,7 @@ class WebsitesPage(QWidget):
         has_selection = self._selected_website() is not None
         self.edit_button.setEnabled(not busy and has_selection)
         self.delete_button.setEnabled(not busy and has_selection)
+        self.use_button.setEnabled(not busy and has_selection)
 
     def _update_row_actions(self) -> None:
         """Enable row actions only when a website is selected."""
@@ -232,6 +244,27 @@ class WebsitesPage(QWidget):
         has_selection = self._selected_website() is not None
         self.edit_button.setEnabled(has_selection)
         self.delete_button.setEnabled(has_selection)
+        self.use_button.setEnabled(has_selection)
+
+    def _on_selection_changed(self) -> None:
+        """Publish the selected Website as the shared Desktop context."""
+
+        self._update_row_actions()
+        website = self._selected_website()
+        if website is not None:
+            self.website_selected.emit(website)
+
+    def open_keywords(self) -> None:
+        """Open Keywords with the selected Website and Entity context."""
+
+        website = self._selected_website()
+        if website is None:
+            self.message.setText("Selectionnez un site a utiliser.")
+            return
+        self.navigation_requested.emit(
+            "Keywords",
+            {"website": website, "entity_id": website.get("entity_id")},
+        )
 
     def _entity_label(self, website: dict[str, Any]) -> str:
         """Return a readable entity label from current or future API fields."""

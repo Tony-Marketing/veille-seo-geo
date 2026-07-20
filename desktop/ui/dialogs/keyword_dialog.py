@@ -19,7 +19,13 @@ class KeywordDialog(QDialog):
     MAX_INTENT_LENGTH = 100
     MAX_PRIORITY_LENGTH = 50
 
-    def __init__(self, keyword: dict[str, Any] | None = None, parent: object | None = None) -> None:
+    def __init__(
+        self,
+        keyword: dict[str, Any] | None = None,
+        parent: object | None = None,
+        *,
+        default_entity_id: int | None = None,
+    ) -> None:
         """Create the keyword dialog."""
 
         super().__init__(parent)
@@ -46,7 +52,7 @@ class KeywordDialog(QDialog):
         self.priority_input.setMaxLength(self.MAX_PRIORITY_LENGTH)
 
         self.entity_id_input = QLineEdit()
-        entity_id = self.keyword.get("entity_id")
+        entity_id = self.keyword.get("entity_id", default_entity_id)
         self.entity_id_input.setText("" if entity_id is None else str(entity_id))
         self.entity_id_input.setPlaceholderText("Optionnel")
 

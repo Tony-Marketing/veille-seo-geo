@@ -43,7 +43,7 @@ def test_dashboard_v2_page_loads_progressive_sections(monkeypatch, qt_app: QAppl
         def __init__(self, _api_client: object) -> None:
             pass
 
-        def get_overview(self) -> FakeDashboardV2Payload:
+        def get_overview(self, **_filters: object) -> FakeDashboardV2Payload:
             calls.append("overview")
             return FakeDashboardV2Payload(
                 {
@@ -61,7 +61,7 @@ def test_dashboard_v2_page_loads_progressive_sections(monkeypatch, qt_app: QAppl
                 },
             )
 
-        def get_trends(self) -> FakeDashboardV2Payload:
+        def get_trends(self, **_filters: object) -> FakeDashboardV2Payload:
             calls.append("trends")
             return FakeDashboardV2Payload(
                 {"series": [{"label": "SEO Score", "source": "seo", "points": [{"date": "2026-07-10", "value": 75}]}]},
@@ -72,6 +72,7 @@ def test_dashboard_v2_page_loads_progressive_sections(monkeypatch, qt_app: QAppl
             return FakeDashboardV2Paginated(
                 [
                     {
+                        "website_id": 7,
                         "name": "Example",
                         "health_score": 82,
                         "health_status": "good",
@@ -94,6 +95,7 @@ def test_dashboard_v2_page_loads_progressive_sections(monkeypatch, qt_app: QAppl
                         "priority": 1,
                         "severity": "critical",
                         "source": "seo",
+                        "website_id": 7,
                         "website_name": "Example",
                         "title": "Corriger une issue",
                         "navigation_target": "SEO Analysis",
@@ -112,3 +114,53 @@ def test_dashboard_v2_page_loads_progressive_sections(monkeypatch, qt_app: QAppl
     assert page.recommendations_table.rowCount() == 1
     assert page.trends_table.rowCount() == 1
     assert page.operations_table.rowCount() == 10
+
+
+def test_dashboard_v2_page_propagates_website_and_navigation(monkeypatch, qt_app: QApplication) -> None:
+    """Dashboard selection and recommendations publish the existing Website context."""
+
+    filters: list[dict[str, object]] = []
+
+    class FakeService:
+        def __init__(self, _api_client: object) -> None:
+            pass
+
+        def get_overview(self, **values: object) -> FakeDashboardV2Payload:
+            filters.append(values)
+            return FakeDashboardV2Payload({})
+
+        def get_trends(self, **values: object) -> FakeDashboardV2Payload:
+            filters.append(values)
+            return FakeDashboardV2Payload({"series": []})
+
+        def list_websites(self, **values: object) -> FakeDashboardV2Paginated:
+            filters.append(values)
+            return FakeDashboardV2Paginated([{"website_id": 7, "name": "Example"}])
+
+        def list_recommendations(self, **values: object) -> FakeDashboardV2Paginated:
+            filters.append(values)
+            return FakeDashboardV2Paginated(
+                [{"website_id": 7, "source": "seo", "severity": "critical", "navigation_target": "SEO Analysis"}],
+            )
+
+    monkeypatch.setattr(dashboard_page_module, "DashboardV2Service", FakeService)
+    page = DashboardPage(api_client=object())
+    selected: list[dict[str, Any]] = []
+    navigations: list[tuple[str, dict[str, Any]]] = []
+    page.website_selected.connect(selected.append)
+    page.navigation_requested.connect(lambda target, context: navigations.append((target, context)))
+
+    page.set_website_context({"id": 7, "name": "Example"})
+    page.load_overview()
+    page.websites_table.selectRow(0)
+    page.recommendations_table.selectRow(0)
+    page._open_selected_recommendation()
+
+    assert all(values.get("website_id") == 7 for values in filters[-4:])
+    assert selected == [{"id": 7, "name": "Example"}]
+    assert navigations == [
+        (
+            "SEO Analysis",
+            {"website_id": 7, "source": "seo", "source_id": None, "severity": "critical"},
+        ),
+    ]

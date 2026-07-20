@@ -16,13 +16,15 @@ from PySide6.QtWidgets import (
 class CrawlDialog(QDialog):
     """Collect crawl creation parameters."""
 
-    def __init__(self, parent: Any | None = None) -> None:
+    def __init__(self, parent: Any | None = None, *, default_website_id: int | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Nouveau crawl")
         self.resize(420, 220)
 
         self.website_id_input = QLineEdit()
         self.website_id_input.setPlaceholderText("Optionnel")
+        if default_website_id is not None:
+            self.website_id_input.setText(str(default_website_id))
 
         self.start_url_input = QLineEdit()
         self.start_url_input.setPlaceholderText("https://www.example.com")

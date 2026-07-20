@@ -3,7 +3,7 @@
 from typing import Any
 
 from core.api_client import ApiClient
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
@@ -21,6 +21,9 @@ from services.geo_analysis_service import GeoAnalysisService, GeoAnalysisService
 class GeoAnalysisPage(QWidget):
     """Display and manage GEO analyses through the REST API."""
 
+    navigation_requested = Signal(str, object)
+    data_changed = Signal()
+
     ANALYSIS_COLUMNS = ["ID", "SEO", "Statut", "Global", "GEO", "LLM", "Providers", "Recommandations"]
     PROVIDER_COLUMNS = ["Provider", "Modele", "Statut", "Page", "Erreur"]
     RECOMMENDATION_COLUMNS = ["Type", "Severite", "Priorite", "Titre", "Source"]
@@ -31,6 +34,7 @@ class GeoAnalysisPage(QWidget):
         self.analyses: list[dict[str, Any]] = []
         self.current_page = GeoAnalysisService.DEFAULT_PAGE
         self.page_size = GeoAnalysisService.DEFAULT_PAGE_SIZE
+        self.current_website: dict[str, Any] | None = None
 
         title = QLabel("GEO Analysis")
         title.setObjectName("PageTitle")
@@ -51,6 +55,9 @@ class GeoAnalysisPage(QWidget):
 
         self.refresh_button = QPushButton("Rafraichir")
         self.refresh_button.clicked.connect(self.load_geo_analyses)
+
+        self.gsc_button = QPushButton("Ouvrir Google Search Console")
+        self.gsc_button.clicked.connect(self.open_gsc)
 
         self.message = QLabel("")
         self.message.setObjectName("MessageLabel")
@@ -96,6 +103,7 @@ class GeoAnalysisPage(QWidget):
         header_layout.addWidget(self.create_button)
         header_layout.addWidget(self.run_button)
         header_layout.addWidget(self.refresh_button)
+        header_layout.addWidget(self.gsc_button)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 24, 24, 24)
@@ -146,6 +154,7 @@ class GeoAnalysisPage(QWidget):
         else:
             self.load_geo_analyses()
             self.message.setText("Analyse GEO creee.")
+            self.data_changed.emit()
         finally:
             self._set_busy(False)
 
@@ -170,6 +179,7 @@ class GeoAnalysisPage(QWidget):
             self.load_geo_analyses()
             self._populate_details(updated)
             self.message.setText("Analyse GEO terminee.")
+            self.data_changed.emit()
         finally:
             self._set_busy(False)
 
@@ -266,6 +276,17 @@ class GeoAnalysisPage(QWidget):
     def _providers(self) -> list[str]:
         providers = [item.strip().lower() for item in self.providers_input.text().split(",")]
         return [provider for provider in providers if provider] or ["openai"]
+
+    def set_website_context(self, website: dict[str, Any] | None) -> None:
+        self.current_website = website
+
+    def set_navigation_context(self, context: dict[str, Any]) -> None:
+        seo_analysis_id = context.get("seo_analysis_id")
+        if isinstance(seo_analysis_id, int):
+            self.seo_analysis_input.setText(str(seo_analysis_id))
+
+    def open_gsc(self) -> None:
+        self.navigation_requested.emit("Google Search Console", {"website": self.current_website})
 
     def _score(self, value: object) -> str:
         if isinstance(value, int | float):

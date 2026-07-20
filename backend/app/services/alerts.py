@@ -134,6 +134,10 @@ class AlertService:
         data = self._alert_data_from_monitoring_event(event)
         existing = self.repository.get_active_by_deduplication_key(str(data["deduplication_key"]))
         if existing is None:
+            legacy_key = self._legacy_deduplication_key(event)
+            if legacy_key != data["deduplication_key"]:
+                existing = self.repository.get_active_by_deduplication_key(legacy_key)
+        if existing is None:
             return self.repository.create_alert(data), True
 
         updated = self.repository.update_alert(
@@ -143,6 +147,7 @@ class AlertService:
                 "title": data["title"],
                 "message": data["message"],
                 "metadata_": data["metadata_"],
+                "deduplication_key": data["deduplication_key"],
                 "last_seen_at": data["last_seen_at"],
             },
         )
@@ -175,6 +180,18 @@ class AlertService:
         return AlertSeverity.INFO
 
     def _deduplication_key(self, event: MonitoringEvent) -> str:
+        details = event.details if isinstance(event.details, dict) else {}
+        website_id = details.get("website_id")
+        parts = [
+            "monitoring",
+            f"website:{website_id}" if isinstance(website_id, int) else "website:global",
+            self._clean_text(event.event_type) or "system",
+            self._clean_text(event.source) or "unknown",
+            self._clean_text(event.message) or "event",
+        ]
+        return ":".join(parts)[:255]
+
+    def _legacy_deduplication_key(self, event: MonitoringEvent) -> str:
         parts = [
             "monitoring",
             self._clean_text(event.event_type) or "system",

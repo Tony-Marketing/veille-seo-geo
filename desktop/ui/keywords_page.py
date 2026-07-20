@@ -3,7 +3,7 @@
 from typing import Any
 
 from core.api_client import ApiClient
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QDialog,
     QHBoxLayout,
@@ -23,6 +23,9 @@ from ui.dialogs.keyword_dialog import KeywordDialog
 class KeywordsPage(QWidget):
     """Affiche et gere les mots-cles recuperes depuis l'API REST."""
 
+    navigation_requested = Signal(str, object)
+    data_changed = Signal()
+
     COLUMNS = ["Mot-cle", "Intention", "Priorite", "Entite"]
 
     def __init__(self, api_client: ApiClient) -> None:
@@ -31,6 +34,8 @@ class KeywordsPage(QWidget):
         super().__init__()
         self.keywords_service = KeywordsService(api_client)
         self.keywords: list[dict[str, Any]] = []
+        self.current_website: dict[str, Any] | None = None
+        self.current_entity_id: int | None = None
 
         title = QLabel("Keywords")
         title.setObjectName("PageTitle")
@@ -48,6 +53,10 @@ class KeywordsPage(QWidget):
 
         self.refresh_button = QPushButton("Rafraichir")
         self.refresh_button.clicked.connect(self.load_keywords)
+
+        self.next_button = QPushButton("Ouvrir Crawls")
+        self.next_button.clicked.connect(self.open_crawls)
+        self.next_button.setEnabled(False)
 
         self.message = QLabel("")
         self.message.setObjectName("MessageLabel")
@@ -71,6 +80,7 @@ class KeywordsPage(QWidget):
         header_layout.addWidget(self.edit_button)
         header_layout.addWidget(self.delete_button)
         header_layout.addWidget(self.refresh_button)
+        header_layout.addWidget(self.next_button)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 24, 24, 24)
@@ -112,7 +122,7 @@ class KeywordsPage(QWidget):
     def create_keyword(self) -> None:
         """Open the create dialog and create a keyword on confirmation."""
 
-        dialog = KeywordDialog(parent=self)
+        dialog = KeywordDialog(parent=self, default_entity_id=self.current_entity_id)
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
 
@@ -124,6 +134,7 @@ class KeywordsPage(QWidget):
         else:
             self.load_keywords()
             self.message.setText("Mot-cle ajoute.")
+            self.data_changed.emit()
         finally:
             self._set_busy(False)
 
@@ -152,6 +163,7 @@ class KeywordsPage(QWidget):
         else:
             self.load_keywords()
             self.message.setText("Mot-cle modifie.")
+            self.data_changed.emit()
         finally:
             self._set_busy(False)
 
@@ -187,6 +199,7 @@ class KeywordsPage(QWidget):
         else:
             self.load_keywords()
             self.message.setText("Mot-cle supprime.")
+            self.data_changed.emit()
         finally:
             self._set_busy(False)
 
@@ -222,6 +235,7 @@ class KeywordsPage(QWidget):
 
         self.create_button.setEnabled(not busy)
         self.refresh_button.setEnabled(not busy)
+        self.next_button.setEnabled(not busy and self.current_website is not None)
         has_selection = self._selected_keyword() is not None
         self.edit_button.setEnabled(not busy and has_selection)
         self.delete_button.setEnabled(not busy and has_selection)
@@ -232,6 +246,22 @@ class KeywordsPage(QWidget):
         has_selection = self._selected_keyword() is not None
         self.edit_button.setEnabled(has_selection)
         self.delete_button.setEnabled(has_selection)
+
+    def set_website_context(self, website: dict[str, Any] | None) -> None:
+        """Apply the Entity associated with the current Website."""
+
+        self.current_website = website
+        entity_id = website.get("entity_id") if website is not None else None
+        self.current_entity_id = entity_id if isinstance(entity_id, int) else None
+        self.next_button.setEnabled(website is not None)
+
+    def open_crawls(self) -> None:
+        """Continue the transverse workflow with the current Website."""
+
+        if self.current_website is None:
+            self.message.setText("Selectionnez d'abord un Website.")
+            return
+        self.navigation_requested.emit("Crawls", {"website": self.current_website})
 
     def _entity_label(self, keyword: dict[str, Any]) -> str:
         """Return a readable entity label from current or future API fields."""

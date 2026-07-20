@@ -3,7 +3,7 @@
 from typing import Any
 
 from core.api_client import ApiClient
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QComboBox,
     QHBoxLayout,
@@ -22,6 +22,9 @@ from services.gsc_service import GSCIndexationResponse, GSCService, GSCServiceEr
 
 class GSCPage(QWidget):
     """Display Google Search Console data returned by the REST API."""
+
+    navigation_requested = Signal(str, object)
+    data_changed = Signal()
 
     PROPERTY_COLUMNS = ["ID", "URL", "Type", "Actif", "Derniere synchro", "Nom", "Permission"]
     PERFORMANCE_COLUMNS = ["Date", "Page", "Query", "Pays", "Device", "Clics", "Impressions", "CTR", "Position"]
@@ -66,6 +69,7 @@ class GSCPage(QWidget):
         super().__init__()
         self.gsc_service = GSCService(api_client)
         self.properties: list[dict[str, Any]] = []
+        self.current_website: dict[str, Any] | None = None
 
         title = QLabel("Google Search Console")
         title.setObjectName("PageTitle")
@@ -99,6 +103,9 @@ class GSCPage(QWidget):
         self.import_button = QPushButton("Importer maintenant")
         self.import_button.clicked.connect(self.run_manual_import)
 
+        self.ga4_button = QPushButton("Ouvrir Google Analytics 4")
+        self.ga4_button.clicked.connect(self.open_ga4)
+
         self.message = QLabel("")
         self.message.setObjectName("MessageLabel")
         self.message.setWordWrap(True)
@@ -124,6 +131,7 @@ class GSCPage(QWidget):
         header_layout.addStretch()
         header_layout.addWidget(self.refresh_button)
         header_layout.addWidget(self.import_button)
+        header_layout.addWidget(self.ga4_button)
 
         filters_first_row = QHBoxLayout()
         filters_first_row.addWidget(self.property_filter)
@@ -195,6 +203,7 @@ class GSCPage(QWidget):
         else:
             self._populate_imports(self.gsc_service.list_imports(property_id=property_id))
             self.message.setText("Import manuel lance.")
+            self.data_changed.emit()
         finally:
             self._set_busy(False)
 
@@ -209,6 +218,12 @@ class GSCPage(QWidget):
             self.property_filter.addItem(label, item.get("id"))
         if current_property_id is not None:
             index = self.property_filter.findData(current_property_id)
+            if index >= 0:
+                self.property_filter.setCurrentIndex(index)
+        website_id = self._current_website_id()
+        if website_id is not None:
+            match = next((item.get("id") for item in result.items if item.get("website_id") == website_id), None)
+            index = self.property_filter.findData(match)
             if index >= 0:
                 self.property_filter.setCurrentIndex(index)
         self.property_filter.blockSignals(False)
@@ -347,6 +362,16 @@ class GSCPage(QWidget):
     def _input_value(self, input_widget: QLineEdit) -> str | None:
         value = input_widget.text().strip()
         return value or None
+
+    def set_website_context(self, website: dict[str, Any] | None) -> None:
+        self.current_website = website
+
+    def open_ga4(self) -> None:
+        self.navigation_requested.emit("Google Analytics 4", {"website": self.current_website})
+
+    def _current_website_id(self) -> int | None:
+        website_id = self.current_website.get("id") if self.current_website is not None else None
+        return website_id if isinstance(website_id, int) else None
 
     def _set_busy(self, busy: bool) -> None:
         self.refresh_button.setEnabled(not busy)

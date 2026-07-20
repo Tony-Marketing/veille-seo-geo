@@ -402,6 +402,12 @@ class SyncSchedulesPage(QWidget):
         except ValueError:
             return None
 
+    def set_website_context(self, website: dict[str, Any] | None) -> None:
+        """Apply the Website filter already supported by the schedules API."""
+
+        website_id = website.get("id") if website is not None else None
+        self.website_id_input.setText(str(website_id) if isinstance(website_id, int) else "")
+
     def _error_message(self, exc: SyncSchedulesServiceError) -> str:
         if exc.code == "bad_request":
             return "Requete de planification invalide."

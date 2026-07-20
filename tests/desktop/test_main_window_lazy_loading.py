@@ -6,15 +6,18 @@ import pytest
 from core.constants import (
     NAVIGATION_PAGES,
     PAGE_ALERTS,
+    PAGE_BING_WEBMASTER_TOOLS,
     PAGE_DASHBOARD,
     PAGE_GEO_ANALYSIS,
     PAGE_GOOGLE_SEARCH_CONSOLE,
     PAGE_MONITORING,
     PAGE_ORCHESTRATION,
+    PAGE_SEO_ANALYSIS,
     PAGE_SYNC_SCHEDULES,
     PAGE_USERS,
     PAGE_WEBSITES,
 )
+from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QApplication, QWidget
 from ui import main_window as main_window_module
 
@@ -35,13 +38,31 @@ def page_creation_log(monkeypatch: pytest.MonkeyPatch, qt_app: QApplication) -> 
 
     class FakePage(QWidget):
         page_name = "Fake"
+        website_selected = Signal(object)
+        navigation_requested = Signal(str, object)
+        data_changed = Signal()
 
         def __init__(self, *_args: object) -> None:
             super().__init__()
+            self.website_context: dict[str, object] | None = None
+            self.navigation_context: dict[str, object] = {}
+            self.refresh_count = 0
             created.append(self.page_name)
+
+        def set_website_context(self, website: dict[str, object] | None) -> None:
+            self.website_context = website
+
+        def set_navigation_context(self, context: dict[str, object]) -> None:
+            self.navigation_context = context
+
+        def load_data(self) -> None:
+            self.refresh_count += 1
 
     class FakeDashboardPage(FakePage):
         page_name = PAGE_DASHBOARD
+
+        def load_overview(self) -> None:
+            self.refresh_count += 1
 
         def refresh_backend_status(self) -> None:
             """Simulate the dashboard refresh hook."""
@@ -58,8 +79,10 @@ def page_creation_log(monkeypatch: pytest.MonkeyPatch, qt_app: QApplication) -> 
     monkeypatch.setattr(main_window_module, "KeywordsPage", fake_page_class("Keywords"))
     monkeypatch.setattr(main_window_module, "CompetitorsPage", fake_page_class("Competitors"))
     monkeypatch.setattr(main_window_module, "CrawlsPage", fake_page_class("Crawls"))
+    monkeypatch.setattr(main_window_module, "SeoAnalysisPage", fake_page_class(PAGE_SEO_ANALYSIS))
     monkeypatch.setattr(main_window_module, "GSCPage", fake_page_class(PAGE_GOOGLE_SEARCH_CONSOLE))
     monkeypatch.setattr(main_window_module, "GeoAnalysisPage", fake_page_class(PAGE_GEO_ANALYSIS))
+    monkeypatch.setattr(main_window_module, "BingWebmasterToolsPage", fake_page_class(PAGE_BING_WEBMASTER_TOOLS))
     monkeypatch.setattr(main_window_module, "SyncSchedulesPage", fake_page_class(PAGE_SYNC_SCHEDULES))
     monkeypatch.setattr(main_window_module, "MonitoringPage", fake_page_class(PAGE_MONITORING))
     monkeypatch.setattr(main_window_module, "AlertsPage", fake_page_class(PAGE_ALERTS))
@@ -131,5 +154,41 @@ def test_main_window_can_open_every_navigation_page(page_creation_log: list[str]
         assert set(window.pages) == set(NAVIGATION_PAGES)
         assert window.stack.count() == len(NAVIGATION_PAGES)
         assert len(page_creation_log) == len(NAVIGATION_PAGES)
+    finally:
+        window.close()
+
+
+def test_main_window_propagates_website_navigation_and_refreshes_open_views(
+    page_creation_log: list[str],
+) -> None:
+    """Qt signals carry Website context and refresh the integrated operational views."""
+
+    window = main_window_module.MainWindow()
+    website = {"id": 7, "entity_id": 3, "name": "Site Groupe"}
+    try:
+        source = window.get_page(PAGE_WEBSITES)
+        assert source is not None
+        source.website_selected.emit(website)
+
+        assert window.session.current_website_id == 7
+        assert window.session.current_entity_id == 3
+
+        source.navigation_requested.emit("Crawls", {"website": website, "crawl_id": 11})
+        crawls = window.pages["Crawls"]
+        assert window.stack.currentWidget() is crawls
+        assert crawls.website_context == website
+        assert crawls.navigation_context == {"website": website, "crawl_id": 11}
+
+        dashboard = window.pages[PAGE_DASHBOARD]
+        monitoring = window.get_page(PAGE_MONITORING)
+        alerts = window.get_page(PAGE_ALERTS)
+        assert monitoring is not None
+        assert alerts is not None
+
+        source.data_changed.emit()
+
+        assert dashboard.refresh_count == 1
+        assert monitoring.refresh_count == 1
+        assert alerts.refresh_count == 1
     finally:
         window.close()

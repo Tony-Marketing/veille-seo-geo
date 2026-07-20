@@ -3,7 +3,7 @@
 from typing import Any
 
 from core.api_client import ApiClient
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QComboBox,
@@ -28,6 +28,8 @@ from services.orchestration_service import (
 
 class OrchestrationPage(QWidget):
     """Display processing orchestration data returned by the REST API."""
+
+    data_changed = Signal()
 
     COLUMNS = [
         "ID",
@@ -190,6 +192,7 @@ class OrchestrationPage(QWidget):
         )
         self._set_busy(False)
         self.load_data()
+        self.data_changed.emit()
 
     def retry_selected(self) -> None:
         """Retry the selected job through the API."""
@@ -208,6 +211,7 @@ class OrchestrationPage(QWidget):
         self.message.setText("Relance planifiee.")
         self._set_busy(False)
         self.load_data()
+        self.data_changed.emit()
 
     def cancel_selected(self) -> None:
         """Cancel the selected job through the API."""
@@ -226,6 +230,7 @@ class OrchestrationPage(QWidget):
         self.message.setText("Job annule.")
         self._set_busy(False)
         self.load_data()
+        self.data_changed.emit()
 
     def reset_filters(self) -> None:
         """Clear filters and reload jobs."""

@@ -1,10 +1,11 @@
 """Page Dashboard V2."""
 
+from functools import partial
 from typing import Any
 
 from core.api_client import ApiClient
 from core.config import APP_NAME, APP_VERSION
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QGridLayout,
     QGroupBox,
@@ -23,6 +24,9 @@ from services.dashboard_v2_service import DashboardV2Service, DashboardV2Service
 class DashboardPage(QWidget):
     """Display Dashboard V2 data returned by the REST API."""
 
+    website_selected = Signal(object)
+    navigation_requested = Signal(str, object)
+
     WEBSITE_COLUMNS = ["Site", "Sante", "SEO", "GEO", "GSC", "GA4", "Bing", "Alertes", "Jobs", "Activite"]
     TREND_COLUMNS = ["Metrique", "Source", "Points"]
     RECOMMENDATION_COLUMNS = ["Priorite", "Severite", "Source", "Site", "Titre", "Navigation"]
@@ -34,6 +38,9 @@ class DashboardPage(QWidget):
         super().__init__()
         self.api_client = api_client
         self.dashboard_service = DashboardV2Service(api_client)
+        self.current_website: dict[str, Any] | None = None
+        self.website_items: list[dict[str, Any]] = []
+        self.recommendation_items: list[dict[str, Any]] = []
 
         title = QLabel("Dashboard V2")
         title.setObjectName("PageTitle")
@@ -57,25 +64,28 @@ class DashboardPage(QWidget):
         self.cards: dict[str, QLabel] = {}
         cards_layout = QGridLayout()
         cards_layout.setSpacing(12)
-        for index, (key, label) in enumerate(
+        for index, (key, label, target) in enumerate(
             [
-                ("health_score", "Sante globale"),
-                ("seo_score", "SEO"),
-                ("geo_score", "GEO"),
-                ("gsc_clicks", "Clics GSC"),
-                ("ga4_sessions", "Sessions GA4"),
-                ("bing_clicks", "Clics Bing"),
-                ("active_alerts", "Alertes actives"),
-                ("failed_jobs", "Jobs en erreur"),
+                ("health_score", "Sante globale", "Websites"),
+                ("seo_score", "SEO", "SEO Analysis"),
+                ("geo_score", "GEO", "GEO Analysis"),
+                ("gsc_clicks", "Clics GSC", "Google Search Console"),
+                ("ga4_sessions", "Sessions GA4", "Google Analytics 4"),
+                ("bing_clicks", "Clics Bing", "Bing Webmaster Tools"),
+                ("active_alerts", "Alertes actives", "Alertes"),
+                ("failed_jobs", "Jobs en erreur", "Orchestrateur"),
             ],
         ):
-            card = self._card(label)
+            card = self._card(label, target)
             self.cards[key] = card.findChild(QLabel, "CardValue") or QLabel("-")
             cards_layout.addWidget(card, index // 4, index % 4)
 
         self.websites_table = self._table(self.WEBSITE_COLUMNS)
+        self.websites_table.itemSelectionChanged.connect(self._select_dashboard_website)
+        self.websites_table.itemDoubleClicked.connect(lambda _item: self._open_selected_website())
         self.trends_table = self._table(self.TREND_COLUMNS)
         self.recommendations_table = self._table(self.RECOMMENDATION_COLUMNS)
+        self.recommendations_table.itemDoubleClicked.connect(lambda _item: self._open_selected_recommendation())
         self.operations_table = self._table(self.OPERATIONS_COLUMNS)
 
         header_layout = QHBoxLayout()
@@ -124,10 +134,11 @@ class DashboardPage(QWidget):
         self.refresh_button.setEnabled(False)
         self.message.setText("Chargement du Dashboard V2...")
         try:
-            overview = self.dashboard_service.get_overview().data
-            trends = self.dashboard_service.get_trends().data
-            websites = self.dashboard_service.list_websites(page_size=10)
-            recommendations = self.dashboard_service.list_recommendations(page_size=10)
+            filters = self._website_filters()
+            overview = self.dashboard_service.get_overview(**filters).data
+            trends = self.dashboard_service.get_trends(**filters).data
+            websites = self.dashboard_service.list_websites(page_size=10, **filters)
+            recommendations = self.dashboard_service.list_recommendations(page_size=10, **filters)
         except DashboardV2ServiceError as exc:
             self.message.setText(self._error_message(exc))
         else:
@@ -163,6 +174,7 @@ class DashboardPage(QWidget):
     def _populate_websites(self, items: list[dict[str, Any]]) -> None:
         """Render website summaries returned by the API."""
 
+        self.website_items = items
         self.websites_table.setRowCount(len(items))
         for row, item in enumerate(items):
             values = [
@@ -196,6 +208,7 @@ class DashboardPage(QWidget):
     def _populate_recommendations(self, items: list[dict[str, Any]]) -> None:
         """Render deterministic recommendations returned by the API."""
 
+        self.recommendation_items = items
         self.recommendations_table.setRowCount(len(items))
         for row, item in enumerate(items):
             values = [
@@ -242,14 +255,62 @@ class DashboardPage(QWidget):
             return "-"
         return " | ".join(f"{item.get('date')}: {self._score(item.get('value'))}" for item in points[-4:])
 
-    def _card(self, title: str) -> QGroupBox:
+    def _card(self, title: str, target: str) -> QGroupBox:
         group = QGroupBox(title)
+        group.setCursor(Qt.CursorShape.PointingHandCursor)
+        group.setToolTip(f"Ouvrir {target}")
+        group.mousePressEvent = partial(self._open_card_target, target)  # type: ignore[method-assign]
         value = QLabel("-")
         value.setObjectName("CardValue")
         value.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout = QVBoxLayout(group)
         layout.addWidget(value)
         return group
+
+    def set_website_context(self, website: dict[str, Any] | None) -> None:
+        """Apply the Website filter used by every Dashboard V2 request."""
+
+        self.current_website = website
+
+    def _website_filters(self) -> dict[str, Any]:
+        website_id = self.current_website.get("id") if self.current_website is not None else None
+        return {"website_id": website_id} if isinstance(website_id, int) else {}
+
+    def _select_dashboard_website(self) -> None:
+        row = self.websites_table.currentRow()
+        if 0 <= row < len(self.website_items):
+            item = self.website_items[row]
+            website_id = item.get("website_id")
+            if isinstance(website_id, int):
+                self.website_selected.emit({"id": website_id, "name": item.get("name")})
+
+    def _open_selected_website(self) -> None:
+        row = self.websites_table.currentRow()
+        if not 0 <= row < len(self.website_items):
+            return
+        website = self.website_items[row]
+        self.navigation_requested.emit("Websites", {"website_id": website.get("website_id")})
+
+    def _open_selected_recommendation(self) -> None:
+        row = self.recommendations_table.currentRow()
+        if not 0 <= row < len(self.recommendation_items):
+            return
+        item = self.recommendation_items[row]
+        target = item.get("navigation_target")
+        if not isinstance(target, str):
+            return
+        self.navigation_requested.emit(
+            target,
+            {
+                "website_id": item.get("website_id"),
+                "source": item.get("source"),
+                "source_id": item.get("source_id"),
+                "severity": item.get("severity"),
+            },
+        )
+
+    def _open_card_target(self, target: str, _event: object) -> None:
+        self.navigation_requested.emit(target, self._website_filters())
 
     def _section(self, title: str, widget: QWidget) -> QGroupBox:
         group = QGroupBox(title)
