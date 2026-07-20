@@ -139,7 +139,11 @@ class OrchestrationService:
                 self._create_monitoring_event(
                     severity=MonitoringSeverity.ERROR,
                     message="Creation du job de planification impossible.",
-                    details={"schedule_id": schedule.id, "error": self._safe_message(str(exc))},
+                    details={
+                        "schedule_id": schedule.id,
+                        "website_id": schedule.website_id,
+                        "error": self._safe_message(str(exc)),
+                    },
                 )
                 continue
             if job is None:
@@ -283,7 +287,7 @@ class OrchestrationService:
         self._create_monitoring_event(
             severity=MonitoringSeverity.WARNING,
             message="Job d'orchestration annule.",
-            details={"job_id": item.id, "job_type": item.job_type},
+            details=self._job_monitoring_details(item),
         )
         return ProcessingJobRead.model_validate(updated)
 
@@ -335,7 +339,7 @@ class OrchestrationService:
         self._create_monitoring_event(
             severity=MonitoringSeverity.INFO,
             message="Job d'orchestration cree depuis une planification.",
-            details={"job_id": job.id, "schedule_id": schedule.id, "job_type": job.job_type},
+            details=self._job_monitoring_details(job),
         )
         return job
 
@@ -344,7 +348,7 @@ class OrchestrationService:
         monitoring_event = self._create_monitoring_event(
             severity=MonitoringSeverity.INFO,
             message=message,
-            details={"job_id": job.id, "job_type": job.job_type, **self._safe_metadata(details)},
+            details=self._job_monitoring_details(job, details),
         )
         updated = self.repository.update_job(
             job,
@@ -381,7 +385,7 @@ class OrchestrationService:
         self._create_monitoring_event(
             severity=MonitoringSeverity.WARNING,
             message="Retry planifie pour un job d'orchestration.",
-            details={"job_id": job.id, "job_type": job.job_type, "available_at": available_at.isoformat()},
+            details=self._job_monitoring_details(job, {"available_at": available_at.isoformat()}),
         )
         self._refresh_alerts()
         return updated
@@ -391,7 +395,7 @@ class OrchestrationService:
         monitoring_event = self._create_monitoring_event(
             severity=MonitoringSeverity.ERROR,
             message=message,
-            details={"job_id": job.id, "job_type": job.job_type, **self._safe_metadata(details)},
+            details=self._job_monitoring_details(job, details),
         )
         updated = self.repository.update_job(
             job,
@@ -454,6 +458,25 @@ class OrchestrationService:
             self.monitoring_repository,
             now_provider=self.now_provider,
         ).refresh_from_monitoring()
+
+    def _job_monitoring_details(
+        self,
+        job: ProcessingJob,
+        details: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Return stable orchestration metadata including the Website context when known."""
+
+        payload = self._payload(job)
+        values: dict[str, Any] = {
+            "job_id": job.id,
+            "job_type": job.job_type,
+            "schedule_id": job.schedule_id,
+            "website_id": payload.get("website_id"),
+            "target_id": payload.get("target_id"),
+            "target_type": payload.get("target_type"),
+        }
+        values.update(details or {})
+        return self._safe_metadata({key: value for key, value in values.items() if value is not None})
 
     def _log(
         self,

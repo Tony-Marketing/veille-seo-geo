@@ -87,6 +87,15 @@ class WebsitesService:
 
         return self._parse_website_response(response)
 
+    def get_website(self, website_id: int) -> dict[str, Any]:
+        """Return one Website through the REST API."""
+
+        try:
+            response = self.api_client.get(f"/websites/{website_id}")
+        except ApiClientError as exc:
+            raise self._to_service_error(exc) from exc
+        return self._parse_website_response(response)
+
     def update_website(self, website_id: int, payload: dict[str, Any]) -> dict[str, Any]:
         """Update a website through the REST API."""
 

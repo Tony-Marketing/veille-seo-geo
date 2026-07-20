@@ -3,7 +3,7 @@
 from typing import Any
 
 from core.api_client import ApiClient
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QDialog,
     QHBoxLayout,
@@ -23,6 +23,9 @@ from ui.dialogs.crawl_dialog import CrawlDialog
 class CrawlsPage(QWidget):
     """Display and manage crawl sessions through the REST API."""
 
+    navigation_requested = Signal(str, object)
+    data_changed = Signal()
+
     SESSION_COLUMNS = ["URL", "Statut", "Progression", "Pages", "Profondeur"]
     PAGE_COLUMNS = ["URL", "Statut HTTP", "Profondeur", "Type", "Erreur"]
 
@@ -34,6 +37,7 @@ class CrawlsPage(QWidget):
         self.current_page = CrawlsService.DEFAULT_PAGE
         self.page_size = CrawlsService.DEFAULT_PAGE_SIZE
         self.total_pages = 0
+        self.current_website: dict[str, Any] | None = None
 
         title = QLabel("Crawls")
         title.setObjectName("PageTitle")
@@ -58,6 +62,10 @@ class CrawlsPage(QWidget):
 
         self.refresh_button = QPushButton("Rafraichir")
         self.refresh_button.clicked.connect(self.load_crawls)
+
+        self.seo_button = QPushButton("Ouvrir SEO Analysis")
+        self.seo_button.clicked.connect(self.open_seo_analysis)
+        self.seo_button.setEnabled(False)
 
         self.message = QLabel("")
         self.message.setObjectName("MessageLabel")
@@ -92,6 +100,7 @@ class CrawlsPage(QWidget):
         header_layout.addWidget(self.start_button)
         header_layout.addWidget(self.cancel_button)
         header_layout.addWidget(self.refresh_button)
+        header_layout.addWidget(self.seo_button)
 
         search_layout = QHBoxLayout()
         search_layout.addWidget(self.search_input, stretch=1)
@@ -145,7 +154,7 @@ class CrawlsPage(QWidget):
     def create_crawl(self) -> None:
         """Open the create dialog and create a crawl on confirmation."""
 
-        dialog = CrawlDialog(parent=self)
+        dialog = CrawlDialog(parent=self, default_website_id=self._current_website_id())
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         self._set_busy(True)
@@ -156,6 +165,7 @@ class CrawlsPage(QWidget):
         else:
             self.load_crawls()
             self.message.setText("Crawl cree.")
+            self.data_changed.emit()
         finally:
             self._set_busy(False)
 
@@ -180,6 +190,7 @@ class CrawlsPage(QWidget):
             self.load_crawls()
             self.load_pages(crawl_id)
             self.message.setText("Crawl termine ou arrete.")
+            self.data_changed.emit()
         finally:
             self._set_busy(False)
 
@@ -202,6 +213,7 @@ class CrawlsPage(QWidget):
         else:
             self.load_crawls()
             self.message.setText("Demande d'arret envoyee.")
+            self.data_changed.emit()
         finally:
             self._set_busy(False)
 
@@ -278,10 +290,34 @@ class CrawlsPage(QWidget):
         if disabled or crawl is None:
             self.start_button.setEnabled(False)
             self.cancel_button.setEnabled(False)
+            self.seo_button.setEnabled(False)
             return
         status = str(crawl.get("status") or "")
         self.start_button.setEnabled(status in {"PENDING", "FAILED", "CANCELLED"})
         self.cancel_button.setEnabled(status in {"PENDING", "RUNNING"})
+        self.seo_button.setEnabled(status == "COMPLETED")
+
+    def set_website_context(self, website: dict[str, Any] | None) -> None:
+        """Keep the Website used by future crawl actions."""
+
+        self.current_website = website
+
+    def open_seo_analysis(self) -> None:
+        """Open SEO Analysis with the selected completed crawl."""
+
+        crawl = self._selected_crawl()
+        crawl_id = crawl.get("id") if crawl is not None else None
+        if not isinstance(crawl_id, int):
+            self.message.setText("Selectionnez un crawl termine.")
+            return
+        self.navigation_requested.emit(
+            "SEO Analysis",
+            {"website": self.current_website, "crawl_id": crawl_id},
+        )
+
+    def _current_website_id(self) -> int | None:
+        website_id = self.current_website.get("id") if self.current_website is not None else None
+        return website_id if isinstance(website_id, int) else None
 
     def _current_search(self) -> str | None:
         search = self.search_input.text().strip()

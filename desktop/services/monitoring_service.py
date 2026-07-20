@@ -102,10 +102,13 @@ class MonitoringService:
         *,
         page: int = DEFAULT_PAGE,
         page_size: int = DEFAULT_PAGE_SIZE,
+        website_id: int | None = None,
     ) -> MonitoringPaginatedPayload:
         """Return synchronization schedules as seen by monitoring."""
 
-        return self._get_paginated("/sync-schedules", params=self._pagination_params(page=page, page_size=page_size))
+        params = self._pagination_params(page=page, page_size=page_size)
+        self._add_optional_filters(params, {"website_id": website_id})
+        return self._get_paginated("/sync-schedules", params=params)
 
     def _get_object(self, path: str, resource_name: str) -> dict[str, Any]:
         try:

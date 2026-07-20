@@ -3,7 +3,7 @@
 from typing import Any
 
 from core.api_client import ApiClient
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QComboBox,
     QHBoxLayout,
@@ -28,6 +28,9 @@ from services.google_analytics_service import (
 
 class GoogleAnalyticsPage(QWidget):
     """Display Google Analytics 4 data returned by the REST API."""
+
+    navigation_requested = Signal(str, object)
+    data_changed = Signal()
 
     PROPERTY_COLUMNS = ["ID", "Site", "Property ID", "Nom", "Compte", "Measurement", "Actif", "Token expire"]
     OVERVIEW_COLUMNS = [
@@ -92,6 +95,7 @@ class GoogleAnalyticsPage(QWidget):
 
         super().__init__()
         self.google_analytics_service = GoogleAnalyticsService(api_client)
+        self.current_website: dict[str, Any] | None = None
         self.properties: list[dict[str, Any]] = []
         self.current_page = GoogleAnalyticsService.DEFAULT_PAGE
         self.page_size = GoogleAnalyticsService.DEFAULT_PAGE_SIZE
@@ -151,6 +155,9 @@ class GoogleAnalyticsPage(QWidget):
         self.import_button = QPushButton("Importer maintenant")
         self.import_button.clicked.connect(self.run_manual_import)
 
+        self.bing_button = QPushButton("Ouvrir Bing Webmaster Tools")
+        self.bing_button.clicked.connect(self.open_bing)
+
         self.previous_button = QPushButton("Precedent")
         self.previous_button.clicked.connect(self.previous_page)
         self.previous_button.setEnabled(False)
@@ -192,6 +199,7 @@ class GoogleAnalyticsPage(QWidget):
         header_layout.addStretch()
         header_layout.addWidget(self.refresh_button)
         header_layout.addWidget(self.import_button)
+        header_layout.addWidget(self.bing_button)
 
         filters_first_row = QHBoxLayout()
         filters_first_row.addWidget(self.property_filter)
@@ -350,6 +358,7 @@ class GoogleAnalyticsPage(QWidget):
                 ),
             )
             self.message.setText("Import manuel Google Analytics 4 lance.")
+            self.data_changed.emit()
         finally:
             self._set_busy(False)
             self._update_pagination_actions()
@@ -365,6 +374,12 @@ class GoogleAnalyticsPage(QWidget):
             self.property_filter.addItem(label, item.get("id"))
         if current_property_id is not None:
             index = self.property_filter.findData(current_property_id)
+            if index >= 0:
+                self.property_filter.setCurrentIndex(index)
+        website_id = self.current_website.get("id") if self.current_website is not None else None
+        if isinstance(website_id, int):
+            match = next((item.get("id") for item in result.items if item.get("website_id") == website_id), None)
+            index = self.property_filter.findData(match)
             if index >= 0:
                 self.property_filter.setCurrentIndex(index)
         self.property_filter.blockSignals(False)
@@ -501,6 +516,14 @@ class GoogleAnalyticsPage(QWidget):
             "device_category": self._input_value(self.device_input),
             "country": self._input_value(self.country_input),
         }
+
+    def set_website_context(self, website: dict[str, Any] | None) -> None:
+        self.current_website = website
+        website_id = website.get("id") if website is not None else None
+        self.website_id_input.setText(str(website_id) if isinstance(website_id, int) else "")
+
+    def open_bing(self) -> None:
+        self.navigation_requested.emit("Bing Webmaster Tools", {"website": self.current_website})
 
     def _selected_property_id(self) -> int | None:
         value = self.property_filter.currentData()

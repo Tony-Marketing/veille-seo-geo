@@ -24,6 +24,10 @@ class TopBar(QWidget):
         self.user_label.setObjectName("ValueLabel")
         self.user_label.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight)
 
+        self.website_label = QLabel("Website : aucun")
+        self.website_label.setObjectName("ValueLabel")
+        self.website_label.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight)
+
         self.logout_button = QPushButton("Deconnexion")
         self.logout_button.setEnabled(False)
         if on_logout is not None:
@@ -33,6 +37,7 @@ class TopBar(QWidget):
         layout.setContentsMargins(24, 12, 24, 12)
         layout.addWidget(title)
         layout.addStretch()
+        layout.addWidget(self.website_label)
         layout.addWidget(self.user_label)
         layout.addWidget(self.logout_button)
 
@@ -45,3 +50,8 @@ class TopBar(QWidget):
         """Enable or disable the logout action."""
 
         self.logout_button.setEnabled(enabled)
+
+    def set_website_label(self, label: str) -> None:
+        """Update the displayed Website context."""
+
+        self.website_label.setText(f"Website : {label}")

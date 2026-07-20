@@ -36,7 +36,7 @@ def test_monitoring_service_loads_read_only_endpoints() -> None:
     overview = service.get_overview()
     connectors = service.list_connectors()
     events = service.list_events(severity="warning", event_type="sync")
-    schedules = service.list_sync_schedules()
+    schedules = service.list_sync_schedules(website_id=12)
 
     assert overview.data["total_events"] == 1
     assert connectors[0]["name"] == "Google Search Console"
@@ -45,6 +45,7 @@ def test_monitoring_service_loads_read_only_endpoints() -> None:
     assert [method for method, _url in seen_requests] == ["GET", "GET", "GET", "GET"]
     assert seen_requests[2][1].params["severity"] == "warning"
     assert seen_requests[2][1].params["event_type"] == "sync"
+    assert seen_requests[3][1].params["website_id"] == "12"
 
 
 @pytest.mark.parametrize(

@@ -3,7 +3,7 @@
 from typing import Any
 
 from core.api_client import ApiClient
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QComboBox,
@@ -24,6 +24,9 @@ from services.alerts_service import AlertPaginatedPayload, AlertsService, Alerts
 
 class AlertsPage(QWidget):
     """Display consultative alerts returned by the REST API."""
+
+    navigation_requested = Signal(str, object)
+    data_changed = Signal()
 
     COLUMNS = [
         "ID",
@@ -53,6 +56,8 @@ class AlertsPage(QWidget):
         self.acknowledge_button.clicked.connect(self.acknowledge_selected)
         self.resolve_button = QPushButton("Resoudre")
         self.resolve_button.clicked.connect(self.resolve_selected)
+        self.dashboard_button = QPushButton("Ouvrir Dashboard V2")
+        self.dashboard_button.clicked.connect(self.open_dashboard)
 
         self.message = QLabel("")
         self.message.setObjectName("MessageLabel")
@@ -96,6 +101,7 @@ class AlertsPage(QWidget):
         header_layout.addStretch()
         header_layout.addWidget(self.refresh_from_monitoring_button)
         header_layout.addWidget(self.refresh_button)
+        header_layout.addWidget(self.dashboard_button)
 
         filters_layout = QHBoxLayout()
         filters_layout.addWidget(QLabel("Statut"))
@@ -164,6 +170,7 @@ class AlertsPage(QWidget):
         )
         self._set_busy(False)
         self.load_data()
+        self.data_changed.emit()
 
     def acknowledge_selected(self) -> None:
         """Acknowledge the selected alert through the API."""
@@ -182,6 +189,7 @@ class AlertsPage(QWidget):
         self.message.setText("Alerte acquittee.")
         self._set_busy(False)
         self.load_data()
+        self.data_changed.emit()
 
     def resolve_selected(self) -> None:
         """Resolve the selected alert through the API."""
@@ -200,6 +208,7 @@ class AlertsPage(QWidget):
         self.message.setText("Alerte resolue.")
         self._set_busy(False)
         self.load_data()
+        self.data_changed.emit()
 
     def reset_filters(self) -> None:
         """Clear all filters and reload alerts."""
@@ -312,6 +321,20 @@ class AlertsPage(QWidget):
             self.reset_filters_button,
         ):
             button.setEnabled(not busy)
+
+    def set_navigation_context(self, context: dict[str, Any]) -> None:
+        source = context.get("source")
+        severity = context.get("severity")
+        if isinstance(source, str):
+            self.source_filter.setText(source)
+        if isinstance(severity, str):
+            index = self.severity_filter.findData(severity.title())
+            if index >= 0:
+                self.severity_filter.setCurrentIndex(index)
+        self.load_data()
+
+    def open_dashboard(self) -> None:
+        self.navigation_requested.emit("Tableau de bord", {})
 
     def _error_message(self, exc: AlertsServiceError) -> str:
         if exc.code == "unauthorized":

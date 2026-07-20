@@ -27,14 +27,18 @@ def _monitoring_event(
     severity: str = "warning",
     source: str = "GSC",
     message: str = "Import en retard",
+    website_id: int | None = None,
 ) -> None:
+    details: dict[str, object] = {"schedule_id": 1, "access_token": "hidden"}
+    if website_id is not None:
+        details["website_id"] = website_id
     MonitoringRepository(db_session).create_event(
         {
             "event_type": "sync",
             "severity": severity,
             "source": source,
             "message": message,
-            "details": {"schedule_id": 1, "access_token": "hidden"},
+            "details": details,
             "created_at": datetime(2026, 7, 10, 8, 0, tzinfo=UTC),
         },
     )
@@ -60,6 +64,23 @@ def test_alert_service_generates_alerts_from_monitoring_without_duplicates(db_se
     assert service.summary().total == 1
     assert service.summary().warning == 1
     assert first_refresh.alerts[0].metadata == {"schedule_id": 1}
+
+
+def test_alert_service_deduplicates_per_website(db_session: Session) -> None:
+    """The same anomaly stays stable per Website and distinct between Websites."""
+
+    _monitoring_event(db_session, website_id=10)
+    _monitoring_event(db_session, website_id=20)
+    service = _service(db_session)
+
+    first = service.refresh_from_monitoring()
+    second = service.refresh_from_monitoring()
+
+    assert first.created == 2
+    assert second.created == 0
+    assert service.summary().total == 2
+    assert {item.metadata["website_id"] for item in first.alerts if item.metadata is not None} == {10, 20}
+    assert len({item.deduplication_key for item in first.alerts}) == 2
 
 
 def test_alert_service_filters_acknowledges_resolves_and_summarizes(db_session: Session) -> None:

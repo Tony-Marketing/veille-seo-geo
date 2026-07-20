@@ -3,7 +3,7 @@
 from typing import Any
 
 from core.api_client import ApiClient
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QGridLayout,
     QGroupBox,
@@ -22,6 +22,8 @@ from services.monitoring_service import MonitoringPaginatedPayload, MonitoringSe
 class MonitoringPage(QWidget):
     """Display consultative monitoring data returned by the REST API."""
 
+    navigation_requested = Signal(str, object)
+
     CONNECTOR_COLUMNS = ["Connecteur", "Statut", "Actif", "Derniere sync", "Prochaine sync"]
     EVENT_COLUMNS = ["Date", "Type", "Severite", "Source", "Message"]
     SCHEDULE_COLUMNS = ["Nom", "Type", "Frequence", "Statut", "Actif", "Derniere", "Prochaine"]
@@ -31,12 +33,15 @@ class MonitoringPage(QWidget):
 
         super().__init__()
         self.monitoring_service = MonitoringService(api_client)
+        self.current_website: dict[str, Any] | None = None
 
         title = QLabel("Monitoring")
         title.setObjectName("PageTitle")
 
         self.refresh_button = QPushButton("Rafraichir")
         self.refresh_button.clicked.connect(self.load_data)
+        self.alerts_button = QPushButton("Ouvrir Alertes")
+        self.alerts_button.clicked.connect(self.open_alerts)
 
         self.message = QLabel("")
         self.message.setObjectName("MessageLabel")
@@ -69,6 +74,7 @@ class MonitoringPage(QWidget):
         header_layout.addWidget(title)
         header_layout.addStretch()
         header_layout.addWidget(self.refresh_button)
+        header_layout.addWidget(self.alerts_button)
 
         main_tables_layout = QHBoxLayout()
         main_tables_layout.addWidget(self._section("Connecteurs", self.connectors_table), stretch=1)
@@ -94,7 +100,10 @@ class MonitoringPage(QWidget):
             overview = self.monitoring_service.get_overview().data
             connectors = self.monitoring_service.list_connectors()
             events = self.monitoring_service.list_events(page_size=10)
-            schedules = self.monitoring_service.list_sync_schedules(page_size=10)
+            schedules = self.monitoring_service.list_sync_schedules(
+                page_size=10,
+                website_id=self._website_id(),
+            )
         except MonitoringServiceError as exc:
             self.message.setText(self._error_message(exc))
         else:
@@ -191,6 +200,16 @@ class MonitoringPage(QWidget):
 
     def _set_busy(self, busy: bool) -> None:
         self.refresh_button.setEnabled(not busy)
+
+    def set_website_context(self, website: dict[str, Any] | None) -> None:
+        self.current_website = website
+
+    def open_alerts(self) -> None:
+        self.navigation_requested.emit("Alertes", {"website": self.current_website, "source": "orchestration"})
+
+    def _website_id(self) -> int | None:
+        website_id = self.current_website.get("id") if self.current_website is not None else None
+        return website_id if isinstance(website_id, int) else None
 
     def _error_message(self, exc: MonitoringServiceError) -> str:
         if exc.code == "unauthorized":
